@@ -1,0 +1,63 @@
+## Torch
+- `torch.matmul(A, B)`: ignores all but the last 2 dimensions, assuming they are batch dimensions
+	- the batch dimensions of `A` and `B` don't have to match, torch will broadcast
+- `A.view(dim1, dim2, ...)`: refills contents of a tensor into a new shape `(dim1, dim2, ...)` in Row-Major order
+	- can be used to add dimensions, collapse dimensions, etc.
+
+## Dataset Formats
+- Design choices
+	- `root`
+		- `data`
+			- `action`
+			- `state`
+			- `target`
+			- `overhead_camera`
+			- `wrist_camera`
+		- `meta`
+			- `episode_ends` (all `data.*[i]` arrays' 1st dimension must match `episode_ends[i] - episode_ends[i-1]`)
+	- Time/episode-wise Chunking: split dataset episodes into different files of ~2MB
+- Zarr
+	- Just file format/storage API -- hierarchical `zarr.group`, `group.array`, `zarr.copy`, `zarr.copy_store`, `DirectoryStore`, `MemoryStore`, `.chunks`, `.compressor`
+		- i.e. `root`, `data`, `meta` are all `zarr.group`s; `action`, `state`, etc., `episode_ends` are `zarr.array`s
+	- Easy recompressing/rechunking/copying via `zarr.copy`
+	- Provides compression options (i.e. LZ4 (fast/moderate compression) or Zstd (slower/better compression))
+	- More cloud-native (i.e. for S3)
+- HDF5
+	- Another backend/format/storage API
+		- Monolithic .h5 files with internal chunking
+	- Possibly more performant for local storage
+- Parquet
+	- Cloud-native storage of tabular row/col data; not good for image data or N-D arrays
+	- Good schema evolution (i.e. adding new columns)
+- Huggingface Dataset Format & Dataloader
+	- `Datasets`
+		- 1-line handoff to Pytorch/JAX dataloader
+		- Lazy-streaming for massive local or cloud datasets
+		- Filtering/sharding/train-test splitting functions
+		- Fast storage/access in memory for vector data using Apache Arrow tables
+	- `LeRobot Dataset`
+		- Tabular (states/actions/targets) $\rightarrow$ parquet
+		- Camera Images $\rightarrow$ mp4 Shards
+		- JSON metadata that maps episode parquet rows to corresponding mp4 video frame
+
+## Database Sharding
+- Splitting database into smaller pieces ("shards")
+	- Allows storing more data
+	- Improve performance/latency (by having smaller sub-databases, fewer rows to search through)
+	- Replication
+- Each shard stored on separate machine
+	- Each shard contains unique rows (unless replication), but share schema
+	- "Logical Shard": data the shard stores
+	- "Physical Shard": machine the shard is stored on
+- Shard Key: how dataset is partitioned
+	- often based on a column in the schema
+	- Range-based Sharding (Dynamic Sharding): 
+		- i.e. partition based on customer names 1st letter ("A" - "I" $\rightarrow$ shard 1, "J" - "S" $\rightarrow$ shard 2, "T" - "Z" $\rightarrow$ shard 3)
+		- Problem: no guarantee of even sharding
+	- Hashed Sharding
+		- Hash each row into a shard
+		- Universal hash functions $\rightarrow$ even distribution of data
+	- Directory Sharding
+		- store separate lookup table that decides where each row is sharded
+	- Geo Sharding
+		- geographical-based

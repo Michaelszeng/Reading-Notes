@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "f0d4239d7e61751f",
+        "id": "10405eb0ec3cc48c",
         "type": "tabs",
         "children": [
           {
-            "id": "879755695aea6345",
+            "id": "a78eea5b3c934e7d",
             "type": "leaf",
             "state": {
               "type": "markdown",
@@ -19,6 +19,20 @@
               },
               "icon": "lucide-file",
               "title": "RandomNotes"
+            }
+          },
+          {
+            "id": "b744bb23b876ce37",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Hardware Notes.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Hardware Notes"
             }
           }
         ]
@@ -40,7 +54,8 @@
             "state": {
               "type": "file-explorer",
               "state": {
-                "sortOrder": "alphabetical"
+                "sortOrder": "alphabetical",
+                "autoReveal": false
               },
               "icon": "lucide-folder-closed",
               "title": "Files"
@@ -77,7 +92,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 238.5
+    "width": 200
   },
   "right": {
     "id": "e1da3b14aeb79882",
@@ -139,13 +154,17 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "RandomNotes.md"
+                "file": "RandomNotes.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-list",
               "title": "Outline of RandomNotes"
             }
           }
-        ]
+        ],
+        "currentTab": 3
       }
     ],
     "direction": "horizontal",
@@ -154,29 +173,35 @@
   },
   "left-ribbon": {
     "hiddenItems": {
+      "bases:Create new base": false,
       "switcher:Open quick switcher": false,
       "graph:Open graph view": false,
       "canvas:Create new canvas": false,
       "daily-notes:Open today's daily note": false,
       "templates:Insert template": false,
-      "command-palette:Open command palette": false,
-      "obsidian-git:Open Git source control": false
+      "command-palette:Open command palette": false
     }
   },
-  "active": "879755695aea6345",
+  "active": "a78eea5b3c934e7d",
   "lastOpenFiles": [
-    "README.md",
+    "RandomNotes(1).md",
+    "ReadingNotesSupplements/inverse_dynamics 1.png",
+    "ReadingNotesSupplements/inverse_dynamics_control.png",
+    "ReadingNotesSupplements/inverse_dynamics.png",
+    "ReadingNotesSupplements/diff_ik_qp.png",
+    "Hardware Notes.md",
+    "RandomNotes.md",
     "GCSReadingNotes.md",
+    "ReadingNotesSupplements/LPA_star_2.png",
+    "ReadingNotesSupplements/LPA_star_1.png",
+    "Pasted image 20250513182251.png",
+    "Pasted image 20250111175127.png",
+    "Pasted image 20250111175125.png",
+    "README.md",
     "Untitled",
     "Untitled.canvas",
     "Untitled 1.md",
-    "Untitled.md",
-    "RandomNotes.md",
     "ReadingNotesSupplements/gcs_star_alg.png",
-    "ReadingNotesSupplements/DiffusionAcceleratedSampling.png",
-    "ReadingNotesSupplements/Diffusion.md",
-    "ReadingNotesSupplements/DiffusionSwissRollResultsDDIM.png",
-    "Pasted image 20250111175127.png",
-    "Pasted image 20250111175125.png"
+    "ReadingNotesSupplements/Diffusion.md"
   ]
 }
