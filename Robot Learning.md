@@ -1,3 +1,41 @@
+
+## UMI-FT
+[In-the-Wild Compliant Manipulation with UMI-FT]([In-the-Wild Compliant Manipulation with UMI-FT](https://arxiv.org/pdf/2601.09988))
+- CoinFT:
+    - MLP to learn mapping from signals to force/torque measurements
+- ACP (Adaptive Compliance Policy)
+    - 10 Hz policy takes history of 32 force/torque measurements, outputs reference position, stiffness
+	    - Data collection: post-process data to obtain stiffness, virtual spring target, grasp forces
+	    - wrench measurements from each sensor encoded into a vector token using causal CNN
+	    - RGB, Depth, F/T are fed into transformer encoder layer (multi-headed self attention + feedforward network, each w/ layernorms)
+		    - Then, concatenate transformer output token to encoded robot proprioception token
+		- 21D output:
+			- 9D pose target $x$ (3 positions, 6 elements of rotation matrix)
+			- 9D Virtual pose target $x_v$
+			- 1D Stiffness Target
+			- 1D Gripper position
+			- 1D Gripper force
+		- Inference:
+			- reconstruct stiffness matrix $K$, send to low-level controller along with virtual target pose $x_v$ and gripper position/force
+			- Note: actual pose target $x$ discarded at runtime
+    - Model-based compliance controllers:
+	    - Foundation: Admittance Control			    $$M \dot{v} + Dv + K(x - x^*) = f_{ext}$$
+		    - Desired relationship btwn robot dynamics and external force is like spring-mass-damper system
+		    - Derivation: simple a re-arranged version of Newton's second law on spring-mass-damper system:					    $$ m \ddot{x} = f_{ext} - d \dot x - k(x - x^*)$$
+		    - Quasi-static assumption: drop the $M \dot v$ term
+		    - Core idea of Admittance control:
+			    - measure $f_{ext}$
+			    - Then, you can compute $x, v$ to get the desired spring-mass-damper motion
+			- Force-tracking Admittance control:
+				- Often, you want to try to apply a force. Then, replace $f_{ext}$ with $f^* - f$ (desired minus measured force). Then, your system acts like a spring-mass-damper when the measured force is not right. An algebraically equivalent interpretation is that you shift $x^*$ so that the spring term encodes the desired force:						$$ \begin{align} & x_{\mathrm{eq}} := x^* + K^{-1} f^* \\ & M \dot{v} + D v + K\bigl(x - (x^* + K^{-1} f^*)\bigr) = f \\ & M \dot{v} + D v + K(x - x^*) = f - f^* \end{align}$$
+        - Task-space admittance control
+            - Set TCP at midpoint between fingertips
+	            - Compute net wrench on TCP:			        $$W_{tool} = \text{Ad}_{S_1, T} W_{S_1} + \text{Ad}_{S_2, T} W_{S_2}$$
+		            - $W_{S_1}$ and $W_{S_2}$ are wrenches measured by each sensor, $\text{Ad}_{S_1, T}$ and $\text{Ad}_{S_2, T}$ are "adjoint" transformations into TCP frame
+			            - Note: wrenches are additive when they are expressed in same frame about same point. But you need to be careful w adjoint transformations to ensure wrenches represent the same point.
+            - Grasp-force control:    $$ v_G = K_p (x^*_G - x_G) + K_f(f^*_G - f_G)$$
+			    - Output is grasp velocity; controller regulates both position error and force error
+			    - 
 ## PI
 **[Real-time Chunking]([Real-Time Action Chunking with Large Models](https://www.physicalintelligence.company/research/real_time_chunking)**
 - Problem: inference takes time. Supposing our control loop frequency is fixed, our options are:
@@ -348,26 +386,3 @@ Teleop data from leader arm is used to train model; this way, differences betwee
 			- longer action horizon performs better when there's little noise/unexpected state changes and state can be safely inferred from actions alone (thus, the longer action horizon's ability to condition on a longer action chunk helps).
 			- shorter action horizon performs better when there is environment stochasticity, or if there is distribution shift (i.e. learned dynamics differ from real dynamics, so the inferred states from the action horizon's longer action context are wrong). 
 	- Claim that there is no universally optimal action horizon -- depends on noise in the environment
-
-## Principles of Behavior Cloning
-- Classic supervised learning objective: (MLE on predicting the data distribution)
-$$ \max_\theta \mathbb E_{\mathbf o_t \sim p_{data}(\mathbf o_t)}[\log \pi_\theta(\mathbf a_t | \mathbf o_t)]$$
-- What we actually care about in behavior cloning (minimizing the number of "mistakes" the policy makes in the distribution of states it induces during execution ($c(\mathbf s_t, \mathbf a_t)$ returns penalty of 1 per mistake):
-$$\min_\theta \mathbb E_{\mathbf s_t \sim p_{\pi_\theta(\mathbf s_t)}} [c(\mathbf s_t \mathbf a_t)], \qquad c(\mathbf s_t, \mathbf a_t) = \cases{0 \quad\text{ if } a_t = \pi^*(\mathbf s_t) \\ 1 \quad\text{ otherwise}}$$
-- Fundamental difference between supervised learning and behavior cloning: distribution shift
-	- Supervised learning relies on i.i.d. data samples assumption; this falls apart in behavior cloning where previous robot actions heavily influence future states/observations
-	- Worst case: "tight-rope walker"
-		- Consider an episode length $T$; at every time step, only 1 correct action $\pi^*(\mathbf s_t)$. Taking an incorrect action leads to catastrophic task failure.
-		- Assume $p(\pi_\theta(\mathbf s_t) \ne \pi^*(\mathbf s_t)) \le \epsilon \quad \forall t$
-			$$ \mathbb E \bigg[\sum_{t=1}^T c(\mathbf s_t, \mathbf a_t) \bigg] \le \epsilon T + (1-\epsilon T)\big( \epsilon(T-1) + (1-\epsilon)(\epsilon(T-2) + \dots)\big) = O(\epsilon T^2)$$
-		- The # mistakes scales quadratically with $T$. 
-			- Intuitively, you should expect # mistakes to scale linearly, so behavior cloning does really bad.
-	- We can show that $O(\epsilon T^2)$ is an upper bound on $\mathbb E \bigg[\sum_{t=1}^T c(\mathbf s_t, \mathbf a_t) \bigg]$ for any problem:
-		- TODO
-- Why Behavior Cloning works in practice:
-	- Most problems are unlike the "tight-rope walker" -- mistakes are recoverable
-	- Behavior cloning works well when you make it easy to learn recoveries
-		- Example: broader training distributions
-		- Example: 	<center><img src="ReadingNotesSupplements/behavior_cloning_fundamentals_car_3_cameras.png" alt="" style="width:150px; margin-top: 10px"/></center>
-			- 
-		- Example: DAgger

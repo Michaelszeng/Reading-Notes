@@ -1,12 +1,8 @@
-### Notation
-- $\mathbf s_t$: State
-- $\mathbf o_t$: Observation (by defin. a *subset* of $\mathbf s_t$, if the system is partially observable)
-- $\mathbf a_t$: Action
-- $\pi_\theta(a_t | o_t)$: observation-conditioned policy
-- $\pi_\theta(a_t | s_t)$: state-conditioned, fully observed policy (i.e. $\mathbf o_t = \mathbf s_t$)
-- Markov Property: by definition of $\mathbf s$, $\mathbf s_{t+1} \perp \mathbf s_{t-1} ~|~ \mathbf s_t$; i.e. the state contains all information necessary to determine the evolution of the system
+## RL POST-TRAINING
+### [RLPD - Efficient Online Reinforcement Learning with Offline Data]([Efficient Online Reinforcement Learning with Offline Data](https://arxiv.org/pdf/2302.02948))
 
 
+___
 ### Practical Tips
 - High entropy --> jittery robot
 	- should see this go away by epoch 100-200. Or else, entropy might be too high.

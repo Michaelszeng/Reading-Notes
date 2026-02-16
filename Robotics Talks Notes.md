@@ -1,4 +1,42 @@
 
+### 2/12/26 - Max’s Talk
+- The BC inflection point: Algorithmic breakthroughs
+	- action chunking
+	- generative models
+- setting: MDP
+	- pi(s) = a
+	- Goal: max j = E[sum_t r(s)]
+	- expert policy pi*, learn policy pi
+	- goal: minimize  j(pi*) - j(pi)
+- key ides: BC can learn pi(s) - pi*(s) < eps
+	- question: can we make this also mean j(s) - j*(s) < eps?
+	- key claim: all algorithms (not just BC) suffer j(s) - j*(s) > c^H for horizon length H
+- CORE ASSUMPTION OF MAX: policy class of learner is markovian
+	- action chunking breaks the nonmarkovianity
+- max’s claim that, if action chunk longer than k*, then exponential j(s) - j*(s) is fixed
+- EISS defn: TODO
+	- exponentially fast forgetting of mistakes?
+	- justifies that this is true in practice bc of using low level controller that stabilizes the dynamics
+- generative models
+	- 
+
+- Questions
+	- if you use DART (or other methods for removing compounding error), then does action chunking stop being useful?
+	- were experiments done with markovian expert also?
+	- studied non-markovian expert and learner case?
+
+Markovian experts but use action chunking to break markovianity of learner? and this is helpful to apply a non markovian learner to a markovian expert
+- they also show empirical experiments when expert is non markovian
+
+- Think about DART as a simple mechanism for removing compounding error
+
+## 2/6/26 - Peter Holderreith Talk
+- Motivation:
+	- KEY IDEA: many reward-reweighted samplers rely on SDE sampling
+		- They work in iterative manners; at each sampling step, maintain set $\{x_t^{(i)}\}$ of valid particles
+			- Particles that achieve high reward are resampled multiple times in the next sampling step
+- 
+
 ## 10/24/25 - Shao’s Talk
 - context: shao’s goal is to train a model that outputs *diverse* trajectories (so that he can use beam search to teach it multi-modal actions)
 - Models “generalize” before they “memorize”

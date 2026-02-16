@@ -23,12 +23,15 @@
 	- We apply softmax to every column so that every column sums to 1.
 		- This way, all key tokens share 1 unit of weight to attend to a particular query token
 - Values:
-	- $W_V x'$ generates value vector, a vector in embedding space, that indicates how you apply the meaning of $x'$ to another token $x$
-	- $W_V$ is multiplied to all tokens, then we add a weighted sum of all values to every token, weighted by the attention matrix
+	- $W_V x'$ generates value vector, a vector in some value-feature space, that indicates a delta that you should add to another vector $x$ to apply the meaning of $x'$ to $x$
+	- $W_V$ is multiplied to every token to calculate that token's "value" (i.e. the vector you would add to a $x$ to apply $x'$'s influence)
+	- Then, for each token $x$, we add a weighted sum of the value of every other token $x'$, weighted by the attention matrix.
+		- This effectively applies the influence of all other tokens $x'$ on a token $x$; the weighting means tokens with higher attention with $x$ get more influence
 		- Example for a single $x =$ *"creature"*, which is attended to by "fluffy" and "blue":
 				<center><img src="ReadingNotesSupplements/self_attention_value_Example.png" alt="" style="width:600px; margin-top: 10px"/></center>	
 		- Again, this is applied to all tokens:
 			<center><img src="ReadingNotesSupplements/self_attention_value.png" alt="" style="width:800px; margin-top: 10px"/></center>	
+- The output is then the modified (with attention applied) version of every token.
 - Attention masks:
 	- usually, want to mask later tokens from affecting earlier tokens (in a next-token-prediction setting)
 	- Before applying softmaxes, set lower-diagonal terms to $-\infty$ (so they are zeroed by softmax)
@@ -37,9 +40,11 @@
 				<center><img src="ReadingNotesSupplements/self_attention_equation.png" alt="" style="width:600px; margin-top: 10px"/></center>	
 
 ### Cross Attention
-- Same as self-attention except applying to two distinct "groups" of tokens (i.e. in translation -- cross attend between tokens from each language)
+- Same as self-attention except applying to two distinct "groups" of tokens; one set of tokens are the "keys" and the other are the "queries" (i.e. in translation -- cross attend between tokens from each language)
 - $W_Q$ applied to one group, $W_K$ applied to the other group
 		<center><img src="ReadingNotesSupplements/cross_attention_pattern.png" alt="" style="width:600px; margin-top: 10px"/></center>	
+- In this case, $W_V$ is multiplied by every key token $x$ and added (weighted by the attention pattern) to every query token $x'$.
+- The output then is the modified (with cross-attention applied) version of every query token $x'$.
 - Don't typically use any attention masking
 
 

@@ -51,7 +51,7 @@
 		- Define a face-wise SDF $\phi_i$ per face $i$. Note that this is just a linear function (distance to face).
 		- Encoder contact constraint: $\phi_i(p^P)=0$
 		<center><img src="ReadingNotesSupplements/planning_through_contact_set_discretization.png" alt="" style="width:200px; margin-top: 10px"/></center>
-	- In both contact modes:
+	- In both contact/non-contact modes:
 		- encode $\theta^S$ (rotation of slider) as 2D rotation matrix: $r := (c_\theta, s_\theta), \quad \|r \|^2_2 = 1 \quad \implies \quad \begin{bmatrix} c_\theta & -s_\theta \\ s_\theta & c_\theta \end{bmatrix} \in \mathrm{SO}(2)$
 		- encode forward Euler dynamics:
 			- $N$ knot points for state: $x_0, x_1, \dots, x_N$
