@@ -1,3 +1,41 @@
+#### Current Interests/Future Directions:
+- Advantage-weighted BC: A way to learn a true advantage function that understands task semantics
+- Ways to beat the distribution shift problem?
+- How to make a model that learns an underlying representation that is truly easily fine-tunable to new tasks?
+
+## Chi0
+[χ0: Resource-Aware Robust Manipulation via Taming Distributional Inconsistencies]([$\chi_{0}$: Resource-Aware Robust Manipulation via Taming Distributional Inconsistencies](https://arxiv.org/pdf/2602.09021))
+Pillar 1: Model Arithmetic/Weight Merging
+- Interpolating weights between multiple checkpoints trained w/different hyperparams increases generalization/robustness
+- Collect Datasets $\{D_1, D_2, \dots, D_n\} \sim P_{train}$, train policies $\{\theta_1, \theta_2, \dots, \theta_n\}$
+- Synthesize: $\theta_{merged} = \sum_{i=1}^n \alpha_i \theta_i$, where $\alpha_i \ge 0$, $\sum_{i=1}^n \alpha_i = 1$
+- $\alpha_i$ are optimized by minimizing loss on separate (unseen) validation split consisting of DAgger trajectories from the individual policies
+- In practice, they used $n=4$
+
+Pillar 2: Stage Advantage Estimation + Training
+- Purpose: Differentiate states that are visually similar but correspond to different "stages" in the task
+	- Claim: ambiguity in true state/stage --> wrong action --> compounding error
+- Advantage Estimator:
+	- Training: 
+		- Outputs a single scalar advantage estimate corresponding to how "good" $a_t$ is
+		- Takes frames from $s_t$ and $s_t + s_{t + \Delta}$ (from the same episode) as input; at training, $\Delta$ is randomly sampled. At inference, $\Delta$ is fixed to something short?
+		- Ground-truth labels are just temporal progress
+			- **FUTURE WORK**: using a better learned advantage value (closer to RL)
+	- Use a VLM-like model architecture
+	- The advantage estimator conditions on the "stage" of the task. "Stages" are manually labeled in the dataset
+	- Output of advantage estimator is then thresholded into binary indicator of good vs bad action
+- **Advantage-weighted BC**: The Advantage Estimator is used at training-time only -- use advantage estimator to weight how often a sample is sampled or how much it affects loss computation
+
+Pillar 3: Inference Optimization (Smoothing) + Data Augmentation
+- Temporal Smoothing: very basic exponential weighted average between old chunk and new chunk
+- Data augmentation:
+	- Mirror images horizontally and swap left/right actions/observations
+	- Partial frame-skipping: subsampling data to increase speed of demonstration, randomly drop frames to simulate jumps, 
+
+Random other notes:
+- Suggest a method for data-quality measurement: if it is replayable open (and leads to task success with closely mimicked initial configuration), it's high quality. Believe that data quality is of utmost importance (training on bad data is bad), hence motivating advantage-weighted BC.
+- Thinks that the most important factor in foundation models is plasticity to adapt to new tasks ($\pi_{0.5}$ is good for this). Believes there is underlying representational quality
+
 
 ## UMI-FT
 [In-the-Wild Compliant Manipulation with UMI-FT]([In-the-Wild Compliant Manipulation with UMI-FT](https://arxiv.org/pdf/2601.09988))
