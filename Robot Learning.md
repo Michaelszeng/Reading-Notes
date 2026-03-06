@@ -3,8 +3,47 @@
 - Ways to beat the distribution shift problem?
 - How to make a model that learns an underlying representation that is truly easily fine-tunable to new tasks?
 
+## Action Tokenization + Autoregressive VLAs
+[ActionCodec: What Makes for Good Action Tokenizers]([ActionCodec: What Makes for Good Action Tokenizers](https://www.arxiv.org/pdf/2602.15397))
+- Paradigm: fine-tune VLMs
+- Background on Discrete-Action VLAs
+	- How it works:
+		- action $A$ is represented by sequence of tokens $C = [c_1, c_2, \dots, c_n]$; each $c_k$ belongs to finite vocabulary $\mathcal K = \{ 1, \dots, S\}$
+		- Vector Quantized tokenizer: 
+			- Notation:
+				- $\mathcal F$: encoder, map $A$ to continuous latent $Z = [z_1, z_2, \dots, z_n]$
+				- We convert $[z_1, z_2, \dots, z_n]$ into sequence of tokens by picking the closest token $c_k$ in embedding space (i.e. $c_k = \arg\min_j \| z_k - e_j \|_2$). Generates a sequence $[c_1, c_2, \dots, c_n]$
+					- $e_j$ here is the embedded version (in the same latent space as $z_k$) of token $c_j$
+				- $\mathcal G$: decoder, reconstructs continuous action sequence $\hat{A}$ from the embedded tokens chosen by the codebook: $\hat{A} = \mathcal G(e_{c_1}, \dots, e_{c_n})$
+			- During training:
+				- $\mathcal F$ maps continuous actions from dataset to latents $[z_1, z_2, \dots, z_n]$
+				- Codebook maps latents $[z_1, z_2, \dots, z_n]$ to discrete tokens $[c_1, c_2, \dots, c_n]$
+				- Loss is computed by comparing model output to discrete tokens
+			- During inference:
+				- Model autoregressively predicts discrete token sequence $[c_1, \dots, c_n]$
+				- $\mathcal G$ maps $[c_1, \dots, c_n]$ to continuous action sequence $\hat{A}$
+		- Typically, tokenizer is trained separate from VLA fine-tuning
+	- KEY CLAIM: not having action/diffusion heads (instead representing actions as discrete tokens) --> better preservation of VLM pretrained knowledge, better instruction-following
+		- $\pi_{0.5}$ for example even predicts discrete tokens as auxiliary objective to improve generalization
+	- Autoregressive prediction of action tokens --> higher latency
+
+## A Thousand Ways to do Smoothing
+[Training-Time Action Conditioning for Efficient Real-Time Chunking]([Training-Time Action Conditioning for Efficient Real-Time Chunking](https://arxiv.org/pdf/2512.05964))
+- Key Idea: 
+	1. Always feed clean Action Prefix, only noise Action Postfix
+	2. Set diffusion timestep of Action Prefix tokens to 1.0 (full denoised) while setting it to <1.0 for the noised Action Postfix tokens
+		- (Note that they condition on separate diffusion timestep for each action token)
+	3. Compute Loss only using Action Postfix
+	4. Implement this as a fine-tuning step (after pre-training the model normally)
+- Notes:
+	- Action Prefix is fixed size during inference (estimated inference latency) but randomized `Unif(0, max_delay)` during training
+- Why this works (better than just conditioning on the action prefix):
+	- Pre-training is important: the model has already learned some biases about action sequence continuity and how the prefix tokens should impact the postfix tokens
+	- There is inductive bias in the architecture; 
+		- it's easier to learn continuity if prefix tokens are already treated in action token-space as part of action sequence; self-attention/transformers very good at modeling continuous sequences
+
 ## Chi0
-[χ0: Resource-Aware Robust Manipulation via Taming Distributional Inconsistencies]([$\chi_{0}$: Resource-Aware Robust Manipulation via Taming Distributional Inconsistencies](https://arxiv.org/pdf/2602.09021))
+[χ0: Resource-Aware Robust Manipulation via Taming Distributional Inconsistencies](https://arxiv.org/pdf/2602.09021)
 Pillar 1: Model Arithmetic/Weight Merging
 - Interpolating weights between multiple checkpoints trained w/different hyperparams increases generalization/robustness
 - Collect Datasets $\{D_1, D_2, \dots, D_n\} \sim P_{train}$, train policies $\{\theta_1, \theta_2, \dots, \theta_n\}$
