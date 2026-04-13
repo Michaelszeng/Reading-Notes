@@ -44,7 +44,14 @@
 - $W_Q$ applied to one group, $W_K$ applied to the other group
 		<center><img src="ReadingNotesSupplements/cross_attention_pattern.png" alt="" style="width:600px; margin-top: 10px"/></center>	
 - In this case, $W_V$ is multiplied by every key token $x$ and added (weighted by the attention pattern) to every query token $x'$.
-- The output then is the modified (with cross-attention applied) version of every query token $x'$.
+- **The output is the cross-attended-to query tokens $x'$.**
+- Intuition:
+	- "queries" do the asking/become the output
+	- "keys/values" provide the context the queries attend to
+- Example: encoder-decoder transformers
+		<center><img src="ReadingNotesSupplements/cross_attention_encoder_decoder_architecture.png" alt="" style="width:500px; margin-top: 10px"/></center>	
+	- Encoder often doesn't use cross-attention; it is any model that encodes input into latent key/value tokens
+	- Decoder uses cross-attention as the mechanism to read/condition on encoder's output to produce an output
 - Don't typically use any attention masking
 
 

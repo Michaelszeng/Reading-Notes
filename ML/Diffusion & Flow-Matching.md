@@ -1,4 +1,20 @@
 
+## Diffusion Models for Video Generation
+Central ideas:
+1. Latent diffusion -- Train autoencoder; train diffusion model in that autoencoder's much lower-dimensional latent space
+	- This makes video diffusion reasonable in terms of dimensionality
+2. Patch Tokens
+
+
+## Stochastic Interpolants
+- General framework for defining transports between two distributions
+	- General Form: $x_t = \alpha(t) x_0 + \beta(t) x_1 + \gamma(t) \epsilon$
+		- $x_0$ from distribution A (i.e. $\alpha = t$)
+		- $x_1$ from distribution B (i.e. $\beta = (1-t)$)
+		- $\epsilon$ sampled noise (i.e. $\gamma(t) = \sqrt{t(1-t)}$)
+		- $t$ is the flow-matching/diffusion timestep
+- Flow Matching is an instantiation of Stochastic Interpolants where you train by regressing the induced velocity field by the two distributions
+
 # Principles of Diffusion Models
 [[The Principles of Diffusion Models](https://www.arxiv.org/pdf/2510.21890)]([The Principles of Diffusion Models](https://www.arxiv.org/pdf/2510.21890))
 Diffusion as a VAE

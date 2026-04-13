@@ -3,6 +3,53 @@
 - Ways to beat the distribution shift problem?
 - How to make a model that learns an underlying representation that is truly easily fine-tunable to new tasks?
 
+## Generalization
+[Mac Schwager: How General are Generalist Robot Policies?](https://www.youtube.com/watch?v=C4NQNeSO2vs)
+1. Fine-tuned VLA's do not generalize
+	- "Concept Lock-in": after fine-tuning, loses ability to generalize to new objects/concepts
+	- "Spatial Lock-in": after fine-tuning, loses ability to generalize to new spatial features (i.e. putting the mug on the left instead of the right)
+	- Proposed Soln: L2 weight regularization of just vision encoder weights 
+		- Penalize weights deviating from original (pre-fine-tuning) weights
+2. Diffusion Policies in low-data regime fully generalize
+	- ASSUMPTION: you train the model to memorize (i.e. after val loss increases very high)
+		- During inference, only outputs action sequences that are in the training data
+		- Nearly equivalent to a nearest-neighbor search in embedding space (i.e. if you encode the image, then do a nearest-neighbor search in the embedded image space to find the nearest matching training sample, and output the action sequence from that training sample)
+	- NOTE: the assumption may hold less in the high-data regime
+
+## Representation Learning
+[R3M]([2203.12601](https://arxiv.org/pdf/2203.12601))
+- Main contribution: pre-trained encoder trained using human ego-centric data + time contrastic learning
+- Notation:
+	- $z = F_\phi(I)$
+	- $z$ = encoded image
+	- $F_\phi$ = encoder
+	- $I$ = image
+- Time Contrastic Learning:
+	- Training objective: Distance between images closer in time is smaller
+	- Sample batch $B$ of 3 frames from the same video: $[I_i, I_j, I_k]^{1:B}$ where $i < j < k$:	$$\mathcal{L}_{tcn} = - \sum_{b \in B} \log \frac{e^{S(z_i^b, z_j^b)}}{e^{S(z_i^b, z_j^b)} + e^{S(z_i^b, z_k^b)} + e^{S(z_i^b, z_i^{\neq b})}} = - \sum_{b \in B} \log(1 + e^{S(z_i^b, z_k^b)-S(z_i^b, z_j^b)} + e^{S(z_i^b, z_i^{\ne b}) - S(z_i^b, z_j^b)})$$
+		- $S$ is a "similarity function" (in practice, negative L2 norm in embedding space)
+		- $z_i^{\ne b}$ is a negative sample *from a different video*
+			- In practice, for each 3-frame sample, they use multiple negative examples
+		- $tcn$ = "time contrastive network"
+		- $\frac{e^{S(z_i^b, z_j^b)}}{e^{S(z_i^b, z_j^b)} + e^{S(z_i^b, z_k^b)} + e^{S(z_i^b, z_i^{\neq b})}}$ is a softmax operator
+			- Maximized ($\rightarrow 1$) when numerator $\gg$ denominator
+		- This loss function encourages maximizing the differences $S(z_i^b, z_k^b)-S(z_i^b, z_j^b)$ and $S(z_i^b, z_i^{\ne b}) - S(z_i^b, z_j^b)$
+			- i.e. ensure that the 2 frames close in time have much larger similarity than 2 frames far in time, or 2 frames from different videos 
+- Language Semantic Alignment
+	- Train a separate language predictor $g_\theta$ that takes two image embeddings $z_i$, $z_j$ produced by $F_\phi$, and a language token $l$, produces score if the transition from $z_i$ to $z_j$ completes the task described by the language
+	- Encourage $F_\phi$ to learn semantically meaningful representation
+	- Sample batch $B$ of 2 frames from the same video: $[I_0, I_f]^{1:B}$ where $I_0$ comes from first 20% of video and $I_f$ comes from last 20% of video, along with language label $[l]^{1:B}$:  $$\mathcal{L}_{{language}} = - \sum_{b \in B} \log \frac{e^{g_\theta(z_0^b, z_f^b, l^b)}}{e^{g_\theta(z_0^b, z_f^b, l^b)} + e^{g_\theta(z_0^b, z_0^b, l^b)} + e^{g_\theta(z_0^{\neq b}, z_f^{\neq b}, l^b)}}$$
+		- Identical "contrastive-style" loss function as used in $\mathcal L_{tcn}$
+		- $z_{i/j}^{\ne b}$ is a negative sample *from a different video*
+		- Incentivize high score for 2 different frames from same video, 
+		- Incentivize low score for 2 same frames from the video, and for 2 frames from a different video which when using misaligned wrong language label
+- L1 Regularization: 		$$ \mathcal L_{regularize} = \sum_{b \in B} \|z_i^b\|_1 $$
+	- For image $i$ in batch, apply L1 norm regularization; this prefers sparse embeddings (i.e. many/most components of $z$ being $0$)
+	- Supposed to help with reducing dimension of state-space that is given as input to the decoder (i.e. diffusion UNet), reduce compounding errors (questionable results)
+- Complete Objective function:  
+	- For a given batch of images $I_{0, i, j, k, f}^{1:B}$:  $$\mathcal{L} = \mathbb{E}_{I^{1:B}_{0,i,j,k,f} \sim \mathcal{D}} \left[ \lambda_1 \mathcal{L}_{tcn} + \lambda_2 \mathcal{L}_{language} + \lambda_3 \left\lVert \mathcal{F}_\phi(I_i) \right\rVert_1 + \lambda_4 \left\lVert \mathcal{F}_\phi(I_i) \right\rVert_2 \right]$$
+
+
 ## Action Tokenization + Autoregressive VLAs
 [ActionCodec: What Makes for Good Action Tokenizers]([ActionCodec: What Makes for Good Action Tokenizers](https://www.arxiv.org/pdf/2602.15397))
 - Paradigm: fine-tune VLMs
@@ -75,6 +122,25 @@ Random other notes:
 - Suggest a method for data-quality measurement: if it is replayable open (and leads to task success with closely mimicked initial configuration), it's high quality. Believe that data quality is of utmost importance (training on bad data is bad), hence motivating advantage-weighted BC.
 - Thinks that the most important factor in foundation models is plasticity to adapt to new tasks ($\pi_{0.5}$ is good for this). Believes there is underlying representational quality
 
+## HoMMI (Whole-body Mobile UMI)
+[Learning Whole-Body Mobile Manipulation from Human Demonstrations](https://hommi-robot.github.io/)
+- Key point 1: represent head-actions as a 3D "look-at point" rather than as a 6-DoF head pose
+	- This is to overcome the embodiment difference (human heads/necks have more DoF and often at a different location/height than robot head/neck)
+	- The "look-at point" is the intersection of center camera ray w/the "pointmap" (Note: this requires depth data during data collection to label the "look-at points")
+- Key point 2: do not feed head camera data as RGB; instead:
+	1. Extract DINO-v3 features from each patch in RGB image
+	2. Convert depth image into an "image" of 3D points expressed in left-gripper frame (called the "pointmap")
+		- Downsample the "pointmap" so there's a single point in each of DINO-v3's patches
+	3. For each DINO-v3 patch feature, "lift into 3D" by concatenating a with a sinosoidal encoding of the corresponding 3D point from the pointmap
+	4. Mask out (i.e. drop tokens) whose 3D point from the pointmap has $z<0$ (i.e. geometrically behind the left gripper frame, indicating that it is the demonstrator's arm)
+		- Note: do the same masking but with the pointmap coordinates in right-camera frame
+	5. Attention pool remaining tokens
+		<center><img src="ReadingNotesSupplements/HoMMI_head_observation_encoding_diagram.png" alt="" style="width:900px; margin-top: 10px"/></center>	
+- Note: wrist camera obs are also encoded using DINO-v3; just use CLS token
+- Note: DINO-v3 weights fine-tuned + shared across all cameras (both wrists + head)
+- Whole body controller:
+	- Mid-level controller: task-space interpolator
+	- Low-level controller: Diff-IK; penalizes bimanual tracking most, adds head tracking objective, adds nominal-posture regularization, current-posture regularization, center-of-mass over base objective, upright torso constraint
 
 ## UMI-FT
 [In-the-Wild Compliant Manipulation with UMI-FT]([In-the-Wild Compliant Manipulation with UMI-FT](https://arxiv.org/pdf/2601.09988))
