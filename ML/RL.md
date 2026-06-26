@@ -1,5 +1,67 @@
+
+## Random
+VICE:
+- Problem: image-based RL policies require a success classifier to give the model its reward
+	- RL policy can learn to exploit states where the classifier erroneously gives high success probability
+- Solution: Add all states visited by policy into training set for the classifier with negative labels and retrain the classifier in a DAgger fashion
+	- Eventually, the classifier will learn to correctly classify the state distribution induced by RL policy
+Forward-Backward Controllers
+- Idea: to avoid manual resetting of task during training, train 2 completely separate RL policies at once: one to complete the task, the other to reset the task
+	
 ## RL POST-TRAINING
-### [RLPD - Efficient Online Reinforcement Learning with Offline Data]([Efficient Online Reinforcement Learning with Offline Data](https://arxiv.org/pdf/2302.02948))
+### [RLPD - Efficient Online Reinforcement Learning with Offline Data](https://arxiv.org/pdf/2302.02948))
+Background
+- Problem setting: kick-start RL training with offline data, without any explicit offline pre-training phase (Avoids "offline-to-online" 2-step training procedures).
+- Claims to generalize to many types of offline data, including human demos and sub-optimal trajectories; agnostic to offline data quality
+**Symmetric Sampling**
+- Draw 50% of training batch from offline dataset, 50% from online interactions dataset
+**Layer Normalization**
+- During environment interaction, actor may enter OOD states $\rightarrow$ critic is queried w/ OOD actions $\rightarrow$ over-estimation bias
+	- *over-estimation bias*: 
+- Intuition: constrain critic's ability to extrapolate to unseen inputs
+	- 
+High UTD (Update-to-Data) Ratio
+
+
+
+Ensembles
+
+
+
+## Residual RL
+[Residual Off-Policy RL for Finetuning Behavior Cloning Policies](https://arxiv.org/pdf/2509.19301)
+- Key idea: frozen action-chunking diffusion base policy; separate RL policy producing residual actions at every timestep (non-chunked)
+- RL policy learns:
+	- $\pi_\theta(s_t, a_t^{\text{base}})$ -- actor, conditions on current observations and base policy action
+	- $Q_\phi(s_t, a_t)$ -- critic, conditions on current observations and full action where full action $a_t = a_t^{\text{base}} + \pi_\theta(s_t, a_t^{\text{base}})$ (sum of base policy and RL policy actions)
+- Critic Loss:  $$L(\phi) = \mathbb{E}_{(s_t, a_t, r_t, s_{t+1}, d_t) \sim \mathcal{D}} \bigg[\bigg(Q_\phi(s_t, a_t) - \left(r_t + \gamma (1 - d) Q_\phi \bigl( s_{t+1}, a_{t+1} \bigr)\right)\bigg)^2\bigg]$$
+	- $d \in \{0,1\}$ indicates if current state is terminal
+	- $a_{t+1} = a_{t+1}^{\text{base}} + \pi_\theta(s_{t+1}, a_{t+1}^{\text{base}})$ is the next full action
+	- This is effectively the difference between the current critic's value $Q_\phi(s_t, a_t)$ and the *optimal* value according to Bellman equation: $Q^*(s_t,a_t) = \mathbb{E}[r_t + \gamma \max_{a'} Q^*(s_{t+1}, a')]$
+		- Since $Q^*$ is unknown, they use the approximation $\max_{a'} Q(s_{t+1}, a') \approx Q\bigl(s_{t+1}, \pi_\theta(s_{t+1})\bigr)$, which is true when $\pi_\theta(s_{t+1})$ is close to the optimal $a'$; i.e. the policy is already quite good
+			- This is called ***bootstrapping***
+- Actor Loss:  $$L(\theta) = - \mathbb{E}_{(s_t, a_t^{\text{base}}) \sim \mathcal{D}} \left[ Q_\phi \bigl(s_t, a_t^{\text{base}} + \pi_\theta(s_t, a_t^{\text{base}})\bigr) \right]$$
+	- Basically, just use gradient ascent to train actor to maximize critic's value
+- Training Procedure:
+	- Sample mini-batch of transitions $(s_t, a_t, r_t, s_{t+1}, d_t)$ from replay buffer
+	- Compute next action $a_{t+1} = \pi^{\text{base}}(s_{t+1}) + \pi_\theta(s_{t+1}, a_{t+1}^{\text{base}})$
+	- Use $a_{t+a}$ to perform a critic update (gradient descent)
+	- Perform actor update
+- Training Notes & Training Stability 
+	- Add small Gaussian noise to $a_{t+1}$ before it is used for the critic update/loss function
+		- Adds regularization -- policy must learn general regions of actions that are good, not learn to exploit sharp peaks in the learned Q-function
+	- Delayed actor updates -- only update actor every $k$ mini-batches
+		- Allows the critic to meaningfully learn the value of the policy before the policy changes
+	- Use UTD (update-to-data ratio) $>1$ $\rightarrow$ multiple model update steps per real-world data point/environment step collected
+		- Increases data efficiency
+	- Randomized Ensembled Double Q-Learning -- ensemble of (i.e. 10) Q-networks initialized independently, trained together
+		- At every critic eval, randomly select 2 networks, evaluate, and take minimum of the two as the value
+	- EMA on Critic Networks
+	- $n$-step returns: Instead of using only $r_t$ (i.e. a 1-step reward) in the critic loss's target, use $r_t + \gamma r_{t+1} + \gamma^2 r_{t+2} + \dots + \gamma^{n-1} r_{t+n-1}$
+		- Makes the target more accurate and helps learn with sparse rewards -- the sparse reward at the end of the episode propagates to earlier timesteps faster
+		- The critic loss becomes this (for $n=3$): $$L(\phi) = \mathbb{E}_{(s_t, a_t, r_t, s_{t+1}, d_t) \sim \mathcal{D}} \bigg[\bigg(Q_\phi(s_t, a_t) - \left(r_t + \gamma r_{t+1} + \gamma^2 r_{t+2} + \gamma^3 (1 - d) Q_\phi \bigl( s_{t+3}, a_{t+3} \bigr)\right)\bigg)^2\bigg]$$
+			- Each sample in the minibatch is of the form $(s_t, a_t, r_t, r_{t+1}, r_{t+2}, s_{t+3}, d_t)$
+	- Replay Buffer contains 50% frozen demonstration data + 50% online buffer data
 
 
 ___
@@ -20,6 +82,18 @@ ___
 - Q function $Q_\pi(s, a)$: expected future return if you start in $s$, execute $a$ immediately, and follow $\pi$ after
 - Advantage function $A_\pi(s, a) = Q_\pi(s, a) - V_\pi(s)$: how much better $a$ is than the average action from $s$
 
+### Offline-to-Online RL
+Given an offline dataset (i.e. human demonstrations); you start by pre-training base policy on offline dataset (i.e. using BC, advantage weighted regression, AWR, CAL-QL, etc.)
+- This is the current paradigm in real-world RL for manipulation (RL from scratch in the real world is basically impossible)
+- The Online stage can be either On-policy or Off-policy
+	- Off-policy: you keep the offline dataset in the replay buffer; 50/50 sample from offline data vs newly generated online data
+		- Pro: Much more sample efficient, regularizes policy toward good behavior, may improve coverage of very rare states
+		- Con: Much less stable training
+			- Very wide data distribution and very little data in the actor's actual current state/action regime $\rightarrow$ critic much more likely to be wrong
+	- On-policy: you discard the offline dataset after the offline pre-training phase; only fine-tune based on on-policy data
+		- Pro: Much more stable training
+		- Con: Much less sample efficient
+
 ### Types of RL
 Policy-based: train a neural net policy to maximized expected returns
 Value-based: train a neural net value network to satisfy the Bellman optimality equation; then the policy is simply a greedy execution according to the value network
@@ -31,6 +105,7 @@ Value-based: train a neural net value network to satisfy the Bellman optimality 
 		- Behave *optimally* from $s'$ onward, total (discounted) future value from $s'$ is $\gamma \max_{a'} Q^*(s', a')$
 		- Self-consistency condition: "being optimal from now on" $\implies$ value now = immediate reward + optimal discounted future reward
 - Loss: $L_Q(\theta) = \mathbb{E}_{(s, a, r, s') \sim \mathcal{D}}[(Q_\theta(s,a) - y)^2]$, where $y$ is the "training target": $y = r + \gamma \max_{a'} Q_{\theta-}(s', a')$, where $\theta-$ are parameters of target network (delayed copy of $\theta$)
+	- $y$ is intended to mimic the Bellman-optimal value $Q^*(s,a) = \mathbb{E}[r + \gamma \max_{a'} Q^*(s', a') | s, a]$, but since $Q^*$ is unknown, we approximate using our learned $Q_{\theta-}$
 	- The reason we use $\theta-$ instead of $\theta$ is training stability; we want $y$ to be a constant so our loss is a simple MSE loss. During training, we update $\theta-$ every so often, but mostly keep it fixed for training stability.
 		- In the ideal case (for the loss to "correctly" encode the Bellman optimality equation), we use $\theta$ to compute $y$.
 Actor-Critic: train both a policy and value network
@@ -48,6 +123,7 @@ Actor-Critic: train both a policy and value network
 	- Policy loss encourages both high reward and high entropy
 		- $J(\pi) = \mathbb{E}[\sum_t \gamma^t(r(s_t, a_t) + \alpha H(\pi(\cdot | s_t)))]$
 		- Optimal policy is $\pi^*(a | s) \propto \exp(\frac{1}{\alpha} Q^*(s,a))$
+	- Alternate between actor and critic updates
 
 ### Training
 - 2-phase loop:
@@ -56,14 +132,14 @@ Actor-Critic: train both a policy and value network
 - Rollout/data collection phase:
 	- Actor samples $a_t \sim \pi_\theta(\cdot | s_t)$
 	- Step the environment
-	- Store transition $(s_t, a_t, r_t, s_{t+1}, V_\phi(s_t))$
+	- Store transition $(s_t, a_t, r_t, s_{t+1}, V_\phi(s_t))$ into replay buffer
 	- Repeat for a fixed horizon
 - Gradient optimization phase:
 	- Use critic to get value estimates $V_\phi(s_t)$
 	- Use $r_t$, $V_\phi(s_t)$, discount factor $\gamma$ to compute:
 		- Discounted returns $G_t$
 		- Advantages $A_t$: how much better or worse this action $G_t$ was than expected ($V_\phi(s_t)$): $A_t = G_t - V_\phi(s_t)$
-	- Split data from rollout into minibatches, compute policy loss and value loss, compute entropy bonus to encourage exploration, combine into a total loss $L = L_{policy} + L_{value} - \text{entropy}$
+	- Split replay buffer into minibatches, compute policy loss and value loss, compute entropy bonus to encourage exploration, combine into a total loss $L = L_{policy} + L_{value} - \text{entropy}$
 	- Apply back-prop
 	- Stop early if $D_{KL}(\pi_{\theta_{old}} \| \pi_{\theta_{new}})$ is too large
 - Notes:

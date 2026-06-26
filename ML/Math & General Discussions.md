@@ -22,21 +22,6 @@
 		- The loss-minimizing empirical score function is unique: once you have reached the capacity to learn the exact empirical score function, more training/larger model will not change anything
 		- For general NNs, 
 
-## Understanding Batch Size
-- Larger Batch Size $\rightarrow$ more samples used per optimization step $\rightarrow$
-	- More stable gradients during optimization step
-	- Slower optimization step (if GPU begins to saturate)
-- Smaller batch size can be better
-	- Less stable gradients $\rightarrow$ more exploration, avoid settling into narrow/brittle local minima $\rightarrow$ less overfitting + memorization
-	- 64-128 in general
-- Small datasets $\rightarrow$ use smaller batch size
-- Unstable architectures (i.e. transformers) prefer larger batch sizes (256+)
-#### Good Minima vs Bad Minima
-- Wide valleys imply robustness; model won't fail (or produce high loss) if you vary the parameters slightly or give an OOD input
-- Having too stable gradients $\rightarrow$ gradient descent finds the closest minima and never escapes
-- Slightly unstable gradients $\rightarrow$ escape narrow minima
-
-
 ## Why Gradient Descent Works
 In short: because of high dimensions
 - THE CORE: moving in dimension $A$ causes the optimization landscape of dimension $B$ to change
