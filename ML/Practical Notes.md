@@ -1,5 +1,6 @@
 
 ## Normalization
+Preferred representation: 6D rotations
 DO NOT NORMALIZE ROTATIONS
 - Whether using 6D rotations or quaternions -- they are already $\in [-1, 1]$
 - Normalizing per-dimension stretches the rotation; certain axes get weighed more; not desirable

@@ -69,33 +69,33 @@ Diffusion as a VAE
 1. Define $p_{init}(x)$ (usually 0-1 Gaussian). We sample "noisy images" from $p_{init}$.
 2. Define $p_{data}(x)$ -- the data distribution of "clean images". We want to "denoise" $x_0 \sim p_{init}$ to $x_1 \sim p_{data}$
 3. Goal: learn a vector field $u_t$ (which maps $x_t$ to a direction in $x_t$ space) to guide samples from $p_{init}$ to $p_{data}$.
-	1. This guidance process can be described by an ODE $\frac{d}{dt} x_t = u_t(x_t)$ and "solved" (for $x_1 \sim p_{data}$) using integration methods (i.e. Euler, Euler-Maruyama).
+	- This guidance process can be described by an ODE $\frac{d}{dt} x_t = u_t(x_t)$ and "solved" (for $x_1 \sim p_{data}$) using approximate integration methods (i.e. Euler, Euler-Maruyama).
 4. First, we show how to express the target vector field $u^{target}_t$ mathematically (using conditional/marginal probability paths), though we find $u_t^{target}$ intractable to evaluate. Thus, we must learn $u_t^\theta$ to approximate $u_t^{target}$.
 5. Second, we define loss function on our learned $u^\theta_t$: $\mathcal{L}_{\text{FM}}(\theta) = \mathbb{E}_{t \sim \text{Unif},\, x \sim p_t} \left[ \left\| u_t^{\theta}(x) - u_t^{\text{target}}(x) \right\|^2 \right]$
-	1. We use the fact that the minimizer of $\mathcal{L}_{\text{FM}}(\theta)$ is the same as for $\mathcal{L}_{\text{CFM}}(\theta)$ (using conditional vector fields instead) to make this loss function tractable to compute
+	- We use the fact that the minimizer of $\mathcal{L}_{\text{FM}}(\theta)$ is the same as for $\mathcal{L}_{\text{CFM}}(\theta)$ (using conditional vector fields instead) to make this loss function tractable to compute
 6. Finally, we parameterize $u_t^\theta$ as a neural net and train using $\mathcal{L}_{\text{FM}}(\theta)$ in typical supervised-learning fashion. 
 
-At least, this covers the ODE/Flow-Matching case. The SDE/Diffusion case follows similarly, but the guidance process is an SDE $\mathrm{d}X_t = \left[u_t^{\text{target}}(X_t)+ \frac{\sigma_t^2}{2} \nabla \log p_t(X_t)\right] \mathrm{d}t+ \sigma_t \mathrm{d}W_t$, and we learn the score function $\log p_t(X_t)$ instead of the vector field (though this turns out to be equivalent to learning the vector field).
+At least, this is true for the ODE/Flow-Matching case. The SDE/Diffusion case follows similarly, but the guidance process is an SDE $\mathrm{d}X_t = \left[u_t^{\text{target}}(X_t)+ \frac{\sigma_t^2}{2} \nabla \log p_t(X_t)\right] \mathrm{d}t+ \sigma_t \mathrm{d}W_t$, and we learn the score function $\log p_t(X_t)$ instead of the vector field (though this turns out to be equivalent to learning the vector field).
 
 ### ODE Fundamentals
 - Fundamentals
 	- $X_i$ is an "image"
 	- trajectory $X$: $t \rightarrow X_t$ where $t \in [0,1], X_t \in \mathbb{R}^d$
 	- vector field $u$: $(x,t) \rightarrow v \in \mathbb{R}^d$
-		- i.e. for every time step, every point maps to some vector in $\mathbb{R}^d$
+		- i.e. for every time step, every point maps to some velocity vector
 - ODE: 
 	- $\frac{d}{dt} X_t = u_t(X_t)$         (trajectory follows time-varying vector field)
 	- $X_0 = x_0$                   (initial condition; trajectory starts at initial noisy image)
 - Flow ($\psi$):
 	- $\psi_t(X_0) = X_t$                     is the solution to the ODE
-	- $(x_0, t) \rightarrow \psi_t(x_0)$                i.e. given initial condition, it tells you what $X_t$ for any given timestep $t$
-	- $\frac{d}{dt} \psi_t(x_0) = u_t(\psi_t(x_0))$      i.e. flow ODE (i.e. the derivative of the flow at time $t$ is equal to the vector field at the $X_t$)
+	- $(x_0, t) \rightarrow \psi_t(x_0)$                i.e. given initial condition $x_0$, it tells you what $X_t$ is for any timestep $t$
+	- $\frac{d}{dt} \psi_t(x_0) = u_t(\psi_t(x_0))$      "flow ODE" (i.e. the derivative of the flow at time $t$ is equal to the vector field at the $X_t$)
 	- $\psi_0(x_0) = x_0$                      (initial flow is equal to initial image)
 	- Broadly, flow is a collection of solutions to the ODE (for any given initial condition $x_0$)
 - Big picture: 
 	- vector field defines the ODE
 	- A trajectory is a single solution to the ODE given initial condition $x_0$
-	- Flow is a function that defines all solutions to the ODE for all initial conditions $x_0$
+	- Flow is a function that defines all trajectories/solutions to the ODE for all initial conditions $x_0$
 - Property: If $u_t(x)$ is Lipschitz, then unique solution to flow/trajectory exists
 - Approximately Solving ODEs (i.e. computing $X_t$ for some $X_0$) 
 	- In practice, solving for $\psi_t$ closed-form is impossible; Euler Integration is used

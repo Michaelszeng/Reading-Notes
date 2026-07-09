@@ -7,9 +7,8 @@ VICE:
 	- Eventually, the classifier will learn to correctly classify the state distribution induced by RL policy
 Forward-Backward Controllers
 - Idea: to avoid manual resetting of task during training, train 2 completely separate RL policies at once: one to complete the task, the other to reset the task
-	
-## RL POST-TRAINING
-### [RLPD - Efficient Online Reinforcement Learning with Offline Data](https://arxiv.org/pdf/2302.02948))
+
+#### [RLPD - Efficient Online Reinforcement Learning with Offline Data](https://arxiv.org/pdf/2302.02948))
 Background
 - Problem setting: kick-start RL training with offline data, without any explicit offline pre-training phase (Avoids "offline-to-online" 2-step training procedures).
 - Claims to generalize to many types of offline data, including human demos and sub-optimal trajectories; agnostic to offline data quality
@@ -25,7 +24,6 @@ High UTD (Update-to-Data) Ratio
 
 
 Ensembles
-
 
 
 ## Residual RL

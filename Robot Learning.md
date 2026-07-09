@@ -17,13 +17,27 @@
 	- NOTE: the assumption may hold less in the high-data regime
 
 ## RL Post-Training
-[ReinFlow]([ReinFlow Website](https://reinflow.github.io/))
-- 
+[DAPG]([1709.10087](https://arxiv.org/pdf/1709.10087))
+KEY IDEA: train MLP-based Gaussian BC policy; fine-tune using Natural Policy Gradients + a demonstration regularization reward
+- Base BC policy:
+	- Gaussian policy; MLP outputs mean $\mu$, with additional `log_std` parameter vector defining STD for each action dimension
+	- Optimize (maximum likelihood):
+	$$\max_\theta \sum_{(s,a) \sim \mathcal D} \ln \pi_\theta(a | s)$$
+- RL Algorithm:
+	- Uses Natural Policy Gradient
+		- Uses GAE for advantage estimation
+		- Trains critic using single Monte-Carlo samples (i.e. $\sum_{t' = t}^T \gamma ^{t'-t}r(s_{t'}, a_{t'})$); does not use bootstrap critic target
+	- Adds additional demo-data matching term to policy gradient $$\nabla_\theta J(\theta) = \sum_i \sum_t \nabla_\theta \log \pi_\theta(a_t^i | s_t^i) {A^\pi}(s_t^i, a_t^i) \sum_{(s^j, a^j) \in \mathcal D} \nabla_\theta \log \pi_\theta(a^j | s^j) w(s^j, a^j)$$
+		- In principle: they want $w(s^j, a^j) = A^\pi(s^j, a^j)$ (i.e. increase the probability of predicting demo actions if they are advantageous under policy), but $A^\pi(s^j, a^j)$ is hard to estimate without rolling out current policy $\pi$
+		- In practice: $w(s^j, a^j)$ is a heuristic that decays over time --> less weighting toward matching demo data as policy self-improves
+		- NOTE: In my experiments @ BD, this term is not helpful at all. Perhaps only helpful for a poorly trained/unsuccessful base policy initialization?
 [RL100]([arxiv.org/pdf/2510.14830](https://arxiv.org/pdf/2510.14830))
 1. Train base Diffusion Policy
 2. Offline Post-Training
 	- Objective: $$TODO$$
 3. Online Post-Training
+[ReinFlow]([ReinFlow Website](https://reinflow.github.io/))
+- 
 
 ## Action Tokenization + Autoregressive VLAs
 [ActionCodec: What Makes for Good Action Tokenizers]([ActionCodec: What Makes for Good Action Tokenizers](https://www.arxiv.org/pdf/2602.15397))
@@ -116,6 +130,17 @@ Random other notes:
 - Whole body controller:
 	- Mid-level controller: task-space interpolator
 	- Low-level controller: Diff-IK; penalizes bimanual tracking most, adds head tracking objective, adds nominal-posture regularization, current-posture regularization, center-of-mass over base objective, upright torso constraint
+
+## T-Rex: Tactile-Reactive Dexterous Manipulation
+KEY IDEAS:
+1. Low-rate action expert (large VLM backbone) + High-rate tactile expert (just small diffusion head)
+	- Tactile expert takes 60% denoised action tokens from action expert ( + encoded VLM features), and denoises fully to clean action
+		- This allows it to inherit high-level structure from action expert
+2. Mid-training: Training on non-task-specific demos of manipulation primitives to learn broad coverage of contact-rich behaviors
+	- They also pre-train the low-rate action expert on EgoScale dataset
+	- Mid-training fine-tunes full policy
+	- Task-specific post-training also fine-tunes full policy
+3. Proposed VQ-VAE architecture for force data encoding
 
 ## UMI-FT
 [In-the-Wild Compliant Manipulation with UMI-FT]([In-the-Wild Compliant Manipulation with UMI-FT](https://arxiv.org/pdf/2601.09988))
