@@ -246,6 +246,9 @@ $$
 		- Contrast this with the equivalent theorem using ODEs (with marginal vector fields) instead of SDEs:  $X_0 \sim p_0(x) = p_{init}(x)$ and $\frac{d}{dt} X_t = u_t^{target} (X_t) \quad \implies \quad X_t \sim p_t(\cdot) \quad \quad \text{for } t \in [0,1]$
 		- The SDE version includes the $\sigma_t \mathrm{d}W_t$ noise term, but also includes a "correction" term that is $\frac{\sigma_t^2}{2}$ times the score function
 		- What's surprising is that, no matter how large $\sigma_t$ is, no matter how much noise you inject, the theorem holds; i.e. $X_1 \sim p_{data}(x)$
+	- INTUITION: Score points in direction that most rapidly increases probability density
+		- The added noise spreads $X_t$ out
+		- Score term pulls $X_t$ back toward mean/high-density modes of $p_t$
 - Why use SDE's instead of ODEs?
 	- The ODE formulation is called ***flow matching*** -- gives you a deterministic probability path from $X_0 \sim p_{init}(x)$ to $X_1 \sim p_{data}(x)$. 
 		- This works -- i.e. Stable Diffusion 3 uses this

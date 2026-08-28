@@ -3,6 +3,15 @@
 - Ways to beat the distribution shift problem?
 - How to make a model that learns an underlying representation that is truly easily fine-tunable to new tasks?
 
+## World Action Models
+Dyna-2
+- Key observations:
+	- Scaling up video prediction pre-training (without action labels) improves prediction accuracy for robot data and on-robot performance 
+	- Increasing video prediction pre-training improves cross-embodiment generalization
+	- WAM beats VLA in apples-to-apples comparison
+	- WAM improves language steerability by forcing model to learn causal meaning (in the form of video) of the language, stronger than action prediction alone
+	- WAM is much more robust to visual disturbances
+
 ## Generalization
 [Mac Schwager: How General are Generalist Robot Policies?](https://www.youtube.com/watch?v=C4NQNeSO2vs)
 1. Fine-tuned VLA's do not generalize
@@ -10,7 +19,7 @@
 	- "Spatial Lock-in": after fine-tuning, loses ability to generalize to new spatial features (i.e. putting the mug on the left instead of the right)
 	- Proposed Soln: L2 weight regularization of just vision encoder weights 
 		- Penalize weights deviating from original (pre-fine-tuning) weights
-2. Diffusion Policies in low-data regime fully generalize
+2. Diffusion Policies in low-data regime fully memorize
 	- ASSUMPTION: you train the model to memorize (i.e. after val loss increases very high)
 		- During inference, only outputs action sequences that are in the training data
 		- Nearly equivalent to a nearest-neighbor search in embedding space (i.e. if you encode the image, then do a nearest-neighbor search in the embedded image space to find the nearest matching training sample, and output the action sequence from that training sample)
@@ -36,7 +45,92 @@ KEY IDEA: train MLP-based Gaussian BC policy; fine-tune using Natural Policy Gra
 2. Offline Post-Training
 	- Objective: $$TODO$$
 3. Online Post-Training
+[DPPO]([2409.00588](https://arxiv.org/pdf/2409.00588))
+- 3 contributions:
+	1. 2-layer MDP formulation of running diffusion denoising in environment
+	2. DDIM or fine-tuning only a few denoising steps
+	3. Alternate diffusion noise schedules
+- 2-layer MDP formulation:
+	- Each denoising step is a transition in the MDP
+		- $s$ = current noisy trajectory + sensor observations
+		- $a$ = transition to slightly less noisy action for intermediate denoising steps, or new observations + new noisy action sequence for the final denoising step that produces the executed action
+		- $r$ = 0 for intermediate denoising steps, `env.reward()` for the final denoising step
+	- Policy gradients/PPO can be run as usual in this MDP
+		- 2 discount factors: 
+			- $\gamma$ for environment transitions
+			- $\gamma_{\text{DENOISE}}$ for denoising step transitions
+		- In theory, you could make the value function $V_\phi$ condition on the entire inner MDP state (including states and partially noised action) and use GAE to calculate the advantage independently for every transition
+			- In practice, DPPO uses $V_\phi(s)$ (value func. conditioned on only environment state) and only computes advantage on outer-MDP (environment transition) transitions, copy-pasting (denoising discounted) advantage from the environment transition to all the inner-MDP (denoising step) transitions
+				- Empirically justified decision (learning full inner-MDP state-conditioned $V_\phi$ is impractical -- way too high dimensional, will never be well-explored)
+				- Thus, credit assignment in inner-MDP is wrong/approximate...
+- Partial Fine-tuning
+	- Keep a frozen copy $\bar \theta$ of base policy weights, use those for the first few denoising steps. Only use fine-tuned $\theta$ for the later denoising steps
+		- Basically compress all the non-fine-tuned denoising steps (along with the first fine-tuned denoising step) into one inner MDP transitions 
+- DDIM sampling
+	- Basically just use DDIM with added Gaussian noise instead of DDPM sampling
+	- Also usually clip $\sigma_k$, diffusion noise schedule, to a minimum of $\sigma_{\text{min}}^{\text{exploration}}$`0.01` to increase exploration during rollout
+	- Use a separate clip $\sigma_{\text{min}}^{\text{log-prob calculation}}$ (that is usually larger, `0.1`) to compute log probabilities for the policy gradient
+		- Making this larger flattens the distribution to ensure PPO clip ratio doesn't change a lot even from small policy updates
 [ReinFlow]([ReinFlow Website](https://reinflow.github.io/))
+- KEY IDEA: 
+	- Apply basic policy gradients on a flow policy (using log likelihoods of the entire denoising trajectory); but, the log likelihood is incomputable because the flow path is deterministic
+	- ReinFlow just makes each denoising step a Gaussian (rather than deterministic) so that the log likelihood is computable
+- Notation:
+	- Flow-matching policy $v_\theta(t_k, a^k, o)$
+	- Noising network $\sigma_{\theta'}(t_k, a^k, o)$
+		- Conditions on diffusion timestep, observation, previous action
+- Algorithm:
+	- Training loop:
+		- Rollout Loop:
+			- Sample $a^0 \sim \mathcal N(0, I)$
+			- `for k in {0, ..., K-1}:`
+				- $a^{k+1} \leftarrow a^k + v_\theta(t_k, a^k, o) \Delta t_k + \sigma_{\theta'}(t_k, a^k, o)\epsilon, \quad \epsilon \sim \mathcal N(0, I)$     $\leftarrow$ denoising process
+			- Record entire denoising trajectory $\{a^0, \dots, a^K\}$ into buffer
+			- Roll out $a^K$, receive reward $r$, done flag $d$, new observation $o$
+			- Store $\{a, o, r, d\}$ into rollout buffer
+		- Update Step:
+			- Sample batch $\{a_i, o_i, r_i, d_i\}$ from rollout buffer 
+			- Compute: $\ln \pi^{\bar \theta}(a_i^{k+1} | a_i^k, o_i) = \ln \mathcal N(a_i^{k+1} | a_i^k + v_\theta(t_k, a_i^k, o_i) \Delta t_k, \sigma^2_{\theta'} (t^k, a_i^k, o_i)) \quad \leftarrow$    policy transition probability
+			- Policy Update step: $$\theta, \theta' = {\arg\min}_{\theta, \theta'} \frac{1}{B} \sum_{i=1}^B \bigg[ -A^{\theta_{old}, \theta'_{old}}(o_i, a_i) \sum_{k=1}^{K-1} \ln \pi^{\theta, \theta'}(a_i^{k+1} | a_i^k, o_i) + \text{regularization terms} \bigg]$$
+				- Here, $\sum_{k=1}^{K-1} \ln \pi^{\theta, \theta'}(a_i^{k+1} | a_i^k, o_i)$ is the total log likelihood of the entire denoising trajectory
+				- Computing the actual policy gradient: $$\nabla_{\theta, \theta'} J(\pi^{\theta,\theta'}) = \mathbb E_{\tau \sim \pi^{\theta,\theta'}}\bigg[ \sum_{h=0}^\infty \gamma^h A^{\theta,\theta'}(o_h, a_h^K) \nabla_{\theta,\theta'} \sum_{k=1}^{K-1} \ln \pi^{\theta,\theta'}(a_h^{k+1} | a_h^k, o_h) + \text{regularization terms}\bigg]$$
+			- Intuition: if a given action does well, increase the probability of the entire denoising trajectory that led to that action
+			- You can also use any type of policy gradient algorithm (NPG, PPO, etc.)
+- Implementation Notes:
+	- Added noise $\sigma^2_{\theta'} (t^k, a_i^k, o_i))$ is dependent on both observations and diffusion timestep (their implementation doesn't actually condition on $a_i^k$, the current noisy action sequence)
+		- Shares observation encoder with policy $v_\theta$
+	- Propose adding entropy reward
+	- Suggest that W2 regularization to the base policy hurts performance
+	- Discuss that only "fine-tuning" later denoising steps is possible, but give no ablation on this
+		- Specifically: only learning the injected noise for later denoising steps and using hard-coded noise schedule for the earlier steps
+			- Theoretically beneficial: the terms from the earlier steps cancel out in the PPO likelihood ratio, making the likelihood ratio a product over fewer terms --> lower variance
+		- DDPO's version of this actually only includes the later half of the trajectory in the RL objective
+- Why ReinFlow isn't as robust as typical PPO with an MLP:
+	1. It's just a harder problem than fine-tuning a small, state-based Markovian 1-step MLP with dense rewards
+	2. Rather than increasing the probability of good *actions*, it does so for *denoising trajectories*. This has 3 implications:
+		- Multiple trajectories can lead to a given action; not as efficient as increasing probability of *all* denoising trajectories that lead to that action. In other words: denoising trajectories are higher variance than individual action; need more samples to get reliable policy gradient estimate
+		- Worse credit assignment: a good action increases probability of *all* contributing denoising steps, even if some individual denoising steps were bad
+		- Makes PPO extra conservative: PPO must constrain the denoising trajectory distribution rather than the executed action distribution.
+[OGPO]([[2605.03065] OGPO: Sample Efficient Full-Finetuning of Generative Control Policies](https://arxiv.org/abs/2605.03065))
+- Same inner/outer MDP structure as DPPO
+- Off-policy Q-learning in outer MDP with on-policy PPO in inner MDP
+- Algorithm:
+	1. Collect environment transitions $(s_t, a_t, r_t, s_{t+1})$ to replay buffer
+	2. Off-policy critic update: Train $Q_\phi$ with TD target: $Q_\phi(s,a) = r + \gamma Q_{target}(s', a')$, where $a'$ is sampled from the current policy (this makes sense bc we are calculating the $Q$-value of the current policy)
+	3. On-policy Actor update:
+		- Sample $s$ from reply buffer
+		- Run denoising inference $N$ times from $s$   $\rightarrow$   $a_K^{(j)} \rightarrow \dots \rightarrow a_0^{(j)}$, $j = 1,\dots,N$
+		- Calculate advantage for each denoising trajectory as the $A(s, a_0^{(j)}) = Q(s,a_0^{(j)}) - \frac{1}{N} \sum_{i=1}^j Q(s,a_0^{(i)})$, where the value function is estimated using $N$ MC samples (generated from running inference $N$ times)
+		- Calculate the log-prob of each $a_0^{(j)}$ using ReinFlow-style product
+		- Run a PPO update using the batch of all $A(s, a_0^{(j)})$
+- Key Ideas:
+	- Running denoising inference multiple times from $s$ serves 2 purposes:
+		1. Necessary to get a reasonable value estimate for advantage estimate
+		2. Sample efficiency
+			- Rather than doing policy update from batch of env transitions, you can do it off a batch of denoising inferences
+				- Equivalent to averaging the gradient over multiple denoising steps (i.e. as done in GRPO)
+[EXPO]([[2507.07986] EXPO: Stable Reinforcement Learning with Expressive Policies](https://arxiv.org/abs/2507.07986))
+- KEY IDEA: RL on diffusion policies without doing explicit policy optimization (instead, via a continual fine-tuning loop)
 - 
 
 ## Action Tokenization + Autoregressive VLAs

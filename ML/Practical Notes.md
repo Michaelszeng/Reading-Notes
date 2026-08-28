@@ -1,3 +1,19 @@
+## Mixture of Transformers
+- Method for encoding multi-modal data (i.e. video, text, actions)
+	- Note: in robotics, the text encoder is usually pre-trained frozen
+- Separate transformers/weights for each modality
+- Attend to each other at each transformer layer -- i.e. action tokens attend to intermediate representations of video tokens at each layer
+- Common trick: only use the first few layers of video encoder
+	- Most of temporal reasoning happens in early layers, while later layers are used for encoding/representing fine visual detail
+
+## Gradient Accumulation
+KEY IDEA: train with larger batch sizes even when a single batch doesn't fit in VRAM
+- Select a *micro-batch* size that fits in VRAM
+- Only calculate gradients of each *micro-batch*
+- Average gradients over all *micro-batches*, then apply gradient clipping + gradient descent step 
+Equivalent to full-batch gradient descent:
+- Differentiation is linear; `gradient of the sum` == `sum of gradients`
+- Except when using batch-norm -- batch-norm uses batch's statistics to calculate gradient step
 
 ## Normalization
 Preferred representation: 6D rotations

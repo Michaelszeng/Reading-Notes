@@ -1,4 +1,11 @@
 
+## Neural Thickets
+https://arxiv.org/pdf/2603.12228
+- **Large-scale multitask pretraining doesn't merely learn one good generalist. It organizes weight space so that many specialized versions of that generalist are locally accessible.**
+	- Small perturbations around $\theta^*$ even perform well in newly sampled instances of a learned task family; they aren't merely recovering exact memorized training examples
+- Corroborates with literature showing that LLM fine-tuning often has very low intrinsic dimension, and often performs well even when very light-weight
+	- i.e. why LoRA fine-tuning works
+
 ## Double Descent
 - Traditionally, x-axis is model size (though similar trends are seen with training steps)
 - There are 3 "regimes" of model sizes:

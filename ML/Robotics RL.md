@@ -1,30 +1,66 @@
 
-## Random
-VICE:
-- Problem: image-based RL policies require a success classifier to give the model its reward
-	- RL policy can learn to exploit states where the classifier erroneously gives high success probability
-- Solution: Add all states visited by policy into training set for the classifier with negative labels and retrain the classifier in a DAgger fashion
-	- Eventually, the classifier will learn to correctly classify the state distribution induced by RL policy
-Forward-Backward Controllers
-- Idea: to avoid manual resetting of task during training, train 2 completely separate RL policies at once: one to complete the task, the other to reset the task
+### Dyna's Take (https://www.youtube.com/watch?v=f8ckFlzGWGo)
+- Online RL is not necessary
+- Only need a reward model
+- The most efficient use of robot time is just use it to find the best intervention points for collecting HG-DAgger corrections (based on the reward stagnating)
+- Dyna's first model used purely AWR
+- Dyna's second model (called Dyna-1) used the reward model for determining when to have human intervene
+- Dyna's thesis might not hold for robots already in the wild?
+
+### $\pi_{0.6}^*$
+- Policy conditions on binary good/bad label
+	- First, computes continuous advantage label, but then thresholds this before passing to the model as conditioning
+	- Advantage is computed using a $N$-step returns bootstrapped with their trained value function: $A^{\pi_{\mathrm{ref}}}(o_t, a_t) = \left[ \sum_{t'=t}^{t+N-1} r_{t'} + V^{\pi_{\mathrm{ref}}}(o_{t+N}) \right] - V^{\pi_{\mathrm{ref}}}(o_t)$
+- Value function is trained using simple supervised targets (no value-bootstrapping/TD learning)
+	- It's also not a "value function" per se -- it doesn't measure the value of a state under a given policy. It's more of a general reward function.
 
 #### [RLPD - Efficient Online Reinforcement Learning with Offline Data](https://arxiv.org/pdf/2302.02948))
 Background
 - Problem setting: kick-start RL training with offline data, without any explicit offline pre-training phase (Avoids "offline-to-online" 2-step training procedures).
 - Claims to generalize to many types of offline data, including human demos and sub-optimal trajectories; agnostic to offline data quality
-**Symmetric Sampling**
-- Draw 50% of training batch from offline dataset, 50% from online interactions dataset
-**Layer Normalization**
-- During environment interaction, actor may enter OOD states $\rightarrow$ critic is queried w/ OOD actions $\rightarrow$ over-estimation bias
-	- *over-estimation bias*: 
-- Intuition: constrain critic's ability to extrapolate to unseen inputs
-	- 
-High UTD (Update-to-Data) Ratio
+3 Core Contributions:
+1. **Symmetric Sampling**
+	- For each batch, draw 50% from offline dataset, 50% from online interactions dataset
+2. **Layer Normalization**
+	- During environment interaction, actor may enter OOD states $\rightarrow$ critic is queried w/ OOD actions $\rightarrow$ over-estimation bias
+		- *over-estimation bias* in Q-learning: critic over-estimates values of states $\rightarrow$ compounds due to bootstrap critic targets 
+			- In Q-learning, the critic target is $y_t = r_t + \gamma \max_{a} Q_\phi(s_{t+1}, a)$
+			- since critic is used in its own training target, an over-estimated Q-value (even for just a single $a$ in $s_{t+1}$, because of the $\max$) leads the critic to learn to over-estimate other states to $\rightarrow$ divergence
+	- Intuition: constrain critic's ability to extrapolate to unseen inputs
+		- Using *LayerNorm* in networks bounds extrapolated values of networks on OOD inputs
+			- They show, mathematically, using LayerNorm on the last layer bounds the network output to $\le \| w \|_2$ where $w$ are the network weights of the last layer $$\begin{aligned}
+\underbrace{Q_{\theta,w}(s,a)}_{\text{scalar}}
+&= \|w^T (\psi_\theta(s,a))\| \\
+&\leq \|w\| \, \|(\psi_\theta(s,a))\| \\
+&\leq \|w\|
+\end{aligned}$$
+				- Intuition: the last layer of the network takes dot product of weight vector $w$ with the intermediate feature vector $\psi_\theta(s,a)$ (after the LayerNorm is already applied -- therefore $\|\psi_\theta(s,a)\| \le 1$).
+		- This is a helpful bound because $\psi_\theta(s,a)$ is likely close to 1 for some in-distribution features; OOD features therefore can't produce significantly larger Q-values that in-distribution features.
+3. High UTD (Update-to-Data) Ratio + Ensemble of Q-networks
+	- High UTD alone causes critic overfitting
+	- To resolve this, use a large number (i.e. 10) of Q-critic networks each initialized randomly
+		- During each critic update, all critics use the same boostrapped target, which is determined using the *min* (to prevent over-estimation) Q-value from a random subset (i.e. of 2) critics from the ensemble
+			- i.e. $y_t = r_t + \gamma \min_{i \in Z} Q_i(s_{t+1}, a_{t+1})$ where $Z$ is a random subset of critics
+		- A different subset of critics is used for each critic update
+		- During policy updates, use the average $Q$ value over all critics 
+		- The reason Ensemble of Q-networks helps increase UTD is that, by using a *different* subset of critics for the bootstrapped critic target for each critic update, we prevent overfitting to i.e. a single fixed, noisy critic target.
+- Besides these 3 design decisions, typical off-policy actor-critic algorithm
 
-
-
-Ensembles
-
+#### [SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning]([2401.16013](https://arxiv.org/pdf/2401.16013))
+Summary: a framework for real-world RL
+- Core algorithm: RLPD (off-policy actor critic)
+- Reward function: 
+	- Either, train a binary classifier off state-based information with pos./neg. examples
+	- Or: VICE
+		- Problem: image-based RL policies require a success classifier to give the model its reward
+			- RL policy can learn to exploit states where the classifier erroneously gives high success probability
+		- Solution: Add all states visited by policy into training set for the classifier with negative labels and retrain the classifier in a DAgger fashion
+			- Eventually, the classifier will learn to correctly classify the state distribution induced by RL policy
+- Forward-Backward Controllers
+	- Idea: to avoid manual resetting of task during training, train 2 completely separate RL actors/critics at once: one to complete the task, the other to reset the task
+[HIL-SERL: Precise and Dexterous Robotic Manipulation via Human-in-the-Loop Reinforcement Learning]([hil-serl-paper.pdf](https://hil-serl.github.io/static/hil-serl-paper.pdf))
+- Basically just adds human intervention during the rollout phases of the RLPD algorithm
+	- The human intervention transitions get added to both the rollout buffer and the demo buffer, so it may be sampled more often (since RLPD samples 50% of data from rollout buffer and 50% of data from demo buffer)
 
 ## Residual RL
 [Residual Off-Policy RL for Finetuning Behavior Cloning Policies](https://arxiv.org/pdf/2509.19301)
