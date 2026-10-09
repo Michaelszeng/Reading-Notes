@@ -1,10 +1,19 @@
-
 ## Neural Thickets
 https://arxiv.org/pdf/2603.12228
 - **Large-scale multitask pretraining doesn't merely learn one good generalist. It organizes weight space so that many specialized versions of that generalist are locally accessible.**
 	- Small perturbations around $\theta^*$ even perform well in newly sampled instances of a learned task family; they aren't merely recovering exact memorized training examples
 - Corroborates with literature showing that LLM fine-tuning often has very low intrinsic dimension, and often performs well even when very light-weight
 	- i.e. why LoRA fine-tuning works
+
+## Critical Batch Size
+Literature suggests there is an optimal batch size for training to reach lowest loss the fastest (with fewest FLOPS or samples visited)
+- Below this, gradients are too noisy, optimization is slow
+- Above this, wasting compute
+- Critical batch size scales with dataset size as well as training step (earlier steps need smaller batch sizes, late steps need larger batch sizes)
+	- [Critical Batch Size Revisited](https://arxiv.org/abs/2505.23971) proposes batch-size warmup during training
+- Weak evidence of smaller batch sizes achieving better test generalization despite higher training loss
+- Generally stronger conclusion: different batch sizes end up reaching similar test-time performance if given the right amount of compute
+	- But this hasn't been examined directly in robotics
 
 ## Double Descent
 - Traditionally, x-axis is model size (though similar trends are seen with training steps)

@@ -3,6 +3,30 @@
 - Ways to beat the distribution shift problem?
 - How to make a model that learns an underlying representation that is truly easily fine-tunable to new tasks?
 
+## Continual Learning
+How to learn from new datasets without forgetting capabilities from old datasets
+- General Techniques:
+	- Replay old examples while learning new ones
+		- Some methods ([Memory Anchors](https://arxiv.org/abs/2608.26545)) propose *specific* old data to replay during post-training
+	- Regularization toward base policy
+	- Distillation (require new model to reproduce same actions as old policy)
+	- Frozen base policy with multiple adapters (this doesn't really prevent forgetting of the base policy actions though -- just allows multiple skills)
+	- [RETAIN](https://arxiv.org/abs/2512.08333): $θ_\alpha = (1−a\alpha)θ_\text{base}​+ \alpha θ_\text{fine-tuned}​$
+RL vs SFT ([RL’S RAZOR: WHY ONLINE REINFORCEMENT LEARNING FORGETS LESS](https://arxiv.org/pdf/2509.04259))
+1. *On-policy RL* has implicit regularization that keeps $\text{KL}_\text{new task}(\pi_\text{base} | \pi_\text{fine-tuned})$ and prevents catastrophic forgetting
+	- Intuition: Policy Gradients mostly re-weights the current policy toward higher-reward actions, while SFT trains on a completely external distribution
+	- The key property is *on-policy*; the actual algorithm doesn't matter (policy gradients vs iterative weighted regression)
+		- In fact, they show multiple algorithms prevent catastrophic forgetting:
+			- On-policy 
+			- GRPO
+			- Iteratively fine-tuning model on success examples
+2. $\text{KL}_\text{new task}(\pi_\text{base} | \pi_\text{fine-tuned})$ is a strong predictor of old-task performance degradation
+3. Other Claims:
+	- Regularizing to base policy in weight space does not prevent forgetting
+	- Representation-level changes (i.e. maintaining previous features) does not accurately predict catastrophic forgetting
+	- Rank of weight changes also does not affect forgetting
+	- Larger models still forget, but their performance on both new and old tasks does increases with model size
+
 ## World Action Models
 Dyna-2
 - Key observations:
@@ -40,11 +64,6 @@ KEY IDEA: train MLP-based Gaussian BC policy; fine-tune using Natural Policy Gra
 		- In principle: they want $w(s^j, a^j) = A^\pi(s^j, a^j)$ (i.e. increase the probability of predicting demo actions if they are advantageous under policy), but $A^\pi(s^j, a^j)$ is hard to estimate without rolling out current policy $\pi$
 		- In practice: $w(s^j, a^j)$ is a heuristic that decays over time --> less weighting toward matching demo data as policy self-improves
 		- NOTE: In my experiments @ BD, this term is not helpful at all. Perhaps only helpful for a poorly trained/unsuccessful base policy initialization?
-[RL100]([arxiv.org/pdf/2510.14830](https://arxiv.org/pdf/2510.14830))
-1. Train base Diffusion Policy
-2. Offline Post-Training
-	- Objective: $$TODO$$
-3. Online Post-Training
 [DPPO]([2409.00588](https://arxiv.org/pdf/2409.00588))
 - 3 contributions:
 	1. 2-layer MDP formulation of running diffusion denoising in environment
@@ -129,9 +148,35 @@ KEY IDEA: train MLP-based Gaussian BC policy; fine-tune using Natural Policy Gra
 		2. Sample efficiency
 			- Rather than doing policy update from batch of env transitions, you can do it off a batch of denoising inferences
 				- Equivalent to averaging the gradient over multiple denoising steps (i.e. as done in GRPO)
-[EXPO]([[2507.07986] EXPO: Stable Reinforcement Learning with Expressive Policies](https://arxiv.org/abs/2507.07986))
+[EXPO]([[2507.07986] EXPO: Stable Reinforcement Learning with Expressive Policies](https://arxiv.org/abs/2507.07986)) + [EXPO-FT](https://arxiv.org/pdf/2605.25477)
 - KEY IDEA: RL on diffusion policies without doing explicit policy optimization (instead, via a continual fine-tuning loop)
-- 
+- Base policy $a \sim \pi_{base}(\cdot | s)$, pre-trained using BC
+- Edit policy $\Delta a \sim \pi_{edit}(\cdot | s, a)$, Gaussian policy trained using policy gradients
+	- Constrained to a small edit to around base policy edit ($\Delta a \in [-\beta, \beta]$)
+- Critic function $Q_{\phi}(s,a)$ trained using standard boostrapped critic objective
+- Standard on-policy RL training loop:
+	1. Collect rollouts: sample $N$ actions from $\pi_{base} + \pi_{edit}$, evaluate each using $Q_\phi$, roll out the best one, collecting the $(s, a, r, s')$ transition into replay buffer
+	2. Update $\pi_{base}$: perform 1 gradient step using BC loss on a minibatch of $B$ $(s,a)$ pairs from replay buffer
+	3. Update $\pi_{edit}$: perform 1 gradient step using the loss: $L_{edit} = -\mathbb{E} [Q_\phi(s, a + \Delta a) - \alpha \log \pi_{edit}(\Delta a | s, a)]$ on a minibatch of B transitions from replay buffer
+		- Maximize Q-value + entropy
+	4. Update $Q_\phi(s,a)$: perform $N_{epoch} \times N_{minibatch}$ gradient steps using the loss: $L_{Q}(\phi) = \mathbb E_{(s, a, r, s') \sim \mathcal D}[(Q_\phi(s, a) - y)^2]$, where $y = r + \gamma Q_{\phi'}(s', a_{s'}^*)$, $a_{s'}^*$ is the action the current policy would sample at $s'$ (which is the best-of-$N$ sampled at $s'$)
+- KEY INTUITIONS:
+	- Edit policy helps base policy explore (it is entropy-regularized)
+	- High reward edits are distilled back into the base policy
+	- Without edit policy, the base policy is trained to reinforce its best actions, but does not explore + does not have explicit Q-value maximization
+	- Disadvantage compared to i.e. DPPO/Reinflow: harder critic learning/sensitivity to critic accuracy; must learn $Q$-func instead of $V$-func; must be able to rank $N$ action candidates at same state, while DPPO/Reinflow just need a state-dependent value estimate
+		- Use typical tricks ($Q$-network ensembling)
+- KEY NOTES:
+	- Off-policy; the replay buffer collects experience over the entire training duration, and they use 50/50 sampling from offline pre-training dataset vs collected online transitions
+		- Also use UTD ratio of 20 for critic (20 gradient steps per newly collected sample)
+	- $Q_{\phi'}$ is the Polyak-averaged critic (used just for critic target)
+- KEY FLAW: At deployment, edit policy + best-of-$N$ sampling still seem necessary
+- Key modifications in EXPO-FT:
+	- Show it works for post-training $\pi_{0.5}$ w/ 2 RGB images + proprio
+	- Show it works w/ action chunking (treat a chunk as the action unit)
+	- Use a trained-from-scratch ResNet50 for the critic (avoid sharing encoder with policy for computational reasons)
+	- Add human interventions during rollout phases to speed up learning (but this is not necessary)
+		- Made possible bc the method is off-policy
 
 ## Action Tokenization + Autoregressive VLAs
 [ActionCodec: What Makes for Good Action Tokenizers]([ActionCodec: What Makes for Good Action Tokenizers](https://www.arxiv.org/pdf/2602.15397))
