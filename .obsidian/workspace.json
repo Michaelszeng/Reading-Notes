@@ -55,6 +55,20 @@
             "state": {
               "type": "markdown",
               "state": {
+                "file": "Scratch/RL vs Iterative AWR.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "RL vs Iterative AWR"
+            }
+          },
+          {
+            "id": "922572a77f2e9130",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
                 "file": "School/CS285.md",
                 "mode": "source",
                 "source": false
@@ -64,7 +78,7 @@
             }
           }
         ],
-        "currentTab": 2
+        "currentTab": 4
       }
     ],
     "direction": "vertical"
@@ -98,7 +112,7 @@
             "state": {
               "type": "search",
               "state": {
-                "query": "",
+                "query": "raz",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -119,7 +133,8 @@
               "title": "Bookmarks"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "horizontal",
@@ -214,14 +229,18 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "a40c421f1fa19538",
+  "active": "922572a77f2e9130",
   "lastOpenFiles": [
     "Robot Learning.md",
+    "ML/Robotics RL.md",
     "School/CS285.md",
     "ML/ML Theory.md",
-    "ML/Robotics RL.md",
-    "Hardware Notes.md",
+    "ML/VAEs.md",
+    "ML/Representation Learning.md",
     "RandomNotes.md",
+    "Scratch/RL vs Iterative AWR.md",
+    "Scratch",
+    "Hardware Notes.md",
     "RandomNotes(1).md",
     "ReadingNotesSupplements/inverse_dynamics 1.png",
     "ReadingNotesSupplements/inverse_dynamics_control.png",
@@ -234,7 +253,6 @@
     "Pasted image 20250111175127.png",
     "Pasted image 20250111175125.png",
     "README.md",
-    "Untitled",
     "Untitled.canvas",
     "Untitled 1.md",
     "ReadingNotesSupplements/gcs_star_alg.png",

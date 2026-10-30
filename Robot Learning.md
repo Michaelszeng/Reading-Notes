@@ -135,19 +135,27 @@ KEY IDEA: train MLP-based Gaussian BC policy; fine-tune using Natural Policy Gra
 - Off-policy Q-learning in outer MDP with on-policy PPO in inner MDP
 - Algorithm:
 	1. Collect environment transitions $(s_t, a_t, r_t, s_{t+1})$ to replay buffer
-	2. Off-policy critic update: Train $Q_\phi$ with TD target: $Q_\phi(s,a) = r + \gamma Q_{target}(s', a')$, where $a'$ is sampled from the current policy (this makes sense bc we are calculating the $Q$-value of the current policy)
-	3. On-policy Actor update:
-		- Sample $s$ from reply buffer
+		- Uses ReinFlow-style noise injection at each denoising step
+	2. Critic update: Train $Q_\phi$ with TD target: $Q^\pi_\phi(s,a) = r + \gamma Q^\pi_{target}(s', a')$, 
+		- $s'$ is the state induced by $(s,a)$, and $a'$ is sampled from the current policy at $s'$
+	3. Actor update:
+		- Sample $s$ from replay buffer
 		- Run denoising inference $N$ times from $s$   $\rightarrow$   $a_K^{(j)} \rightarrow \dots \rightarrow a_0^{(j)}$, $j = 1,\dots,N$
-		- Calculate advantage for each denoising trajectory as the $A(s, a_0^{(j)}) = Q(s,a_0^{(j)}) - \frac{1}{N} \sum_{i=1}^j Q(s,a_0^{(i)})$, where the value function is estimated using $N$ MC samples (generated from running inference $N$ times)
-		- Calculate the log-prob of each $a_0^{(j)}$ using ReinFlow-style product
-		- Run a PPO update using the batch of all $A(s, a_0^{(j)})$
+		- Calculate advantage for each denoising trajectory as $A^\pi(s, a_0^{(j)}) = Q^\pi(s,a_0^{(j)}) - \frac{1}{N} \sum_{i=1}^j Q^\pi(s,a_0^{(i)})$ (GRPO-style)
+			- i.e. how much better $a_0^{(j)}$ is than the average action from the $N$ sampled actions
+			- This is effectively estimating the $V(s)$ using $N$ MC samples (since the true Advantage is $A^\pi(s, a_0) = Q^\pi(s,a_0) - V(s)$)
+		- Calculate the log-prob of each $a_K^{(j)} \rightarrow a_0^{(j)}$ denoising chain using ReinFlow-style product
+		- Run a PPO update using the batch of all $A^\pi(s, a_0^{(j)})$
 - Key Ideas:
 	- Running denoising inference multiple times from $s$ serves 2 purposes:
-		1. Necessary to get a reasonable value estimate for advantage estimate
+		1. Get a reasonable value estimate for advantage estimate
 		2. Sample efficiency
-			- Rather than doing policy update from batch of env transitions, you can do it off a batch of denoising inferences
-				- Equivalent to averaging the gradient over multiple denoising steps (i.e. as done in GRPO)
+			- Score and update policy using actions without actually rolling them out
+	- This is an off-policy method; we learn a $Q$ function and optimize it w.r.t. replay buffer states
+- Other details:
+	- Vanilla OGPO suffers from critic over-estimation + exploitation. Propose 2 fixes:
+		- OGPO+: add BC loss for successful rollouts to anchor policy toward good behavior
+		- OGPO+CA: conservative Q-function estimates from an ensemble; only allow non-zero advantage when all Q-functions in the ensemble agree on the pos./neg. of the Q-value
 [EXPO]([[2507.07986] EXPO: Stable Reinforcement Learning with Expressive Policies](https://arxiv.org/abs/2507.07986)) + [EXPO-FT](https://arxiv.org/pdf/2605.25477)
 - KEY IDEA: RL on diffusion policies without doing explicit policy optimization (instead, via a continual fine-tuning loop)
 - Base policy $a \sim \pi_{base}(\cdot | s)$, pre-trained using BC
@@ -177,6 +185,14 @@ KEY IDEA: train MLP-based Gaussian BC policy; fine-tune using Natural Policy Gra
 	- Use a trained-from-scratch ResNet50 for the critic (avoid sharing encoder with policy for computational reasons)
 	- Add human interventions during rollout phases to speed up learning (but this is not necessary)
 		- Made possible bc the method is off-policy
+[PA-RL](https://arxiv.org/pdf/2412.06685)
+- KEY IDEA: Iterative improvement of a BC policy by distilling Q-function optimized actions
+- Algorithm:
+	- For each of $N=1024$ states sampled from the replay buffer (50/50 sampling from on-policy vs off-policy states):
+		1. **Global Optimization**: sample multiple actions from policy, save the best $N$ samples (according to Q-value ranking)
+		2. **Local Optimization**: perform gradient optimization of those actions ($T$ steps of gradient descent: $a \leftarrow a  + \alpha \nabla_a Q_\theta(s,a')|_{a' = a}$)
+			- This serves as Q-func-guided "exploration"
+		3. Distill the $1024$ locally-optimized actions back into policy via BC, weighting each action by its Q-value
 
 ## Action Tokenization + Autoregressive VLAs
 [ActionCodec: What Makes for Good Action Tokenizers]([ActionCodec: What Makes for Good Action Tokenizers](https://www.arxiv.org/pdf/2602.15397))
@@ -429,7 +445,6 @@ Training an Implicit Model
 ```
 Chunking can also help model non-Markovian behavior in human demonstrations. Specifically, a single-step policy would struggle with temporally correlated confounders, such as pauses in the middle of a demonstration, since the behavior not only depends on the state, but also the timestep. Action chunking can mitigate this issue when the confounder is within a chunk, without introducing the causal confusion issue for history-conditioned policies.
 ```
-- 
 
 Teleop data from leader arm is used to train model; this way, differences between leader and follower are learned implicitly as forces
 
@@ -440,13 +455,13 @@ Teleop data from leader arm is used to train model; this way, differences betwee
 	- This is better than simply training a regression model that doesn't condition on $z$; this will learn to average modes while conditioning on learned $z$ tells the model that each value of $z$ corresponds to a single mode.
 - CVAE Encoder architecture:
 	- Take in expert action sequence and current joint position, output $z$
-	- BERT-style Transformer with unmasked self-attention (i.e. prepend a `[CLS]` token, which is transformed and serves as the output)
+	- BERT-style Transformer with self-attention (i.e. prepend a `[CLS]` token, which is transformed and serves as the output)
 	- The output of the BERT Transformer is fed through another MLP to get a lower-dimensional $z$
 		- Need $z$ to be lower dimensional so it learns a useful but compressed signal, and doesn't just contain exact information on what the expert trajectory was
 - CVAE Decoder architecture:
 	- simple Transformer encoder
 		- camera images, joint positions, $z$ all projected into token space using MLPs, fed as a token sequence into transformer
-		- transformer uses unmasked self-attention to transform input token sequence
+		- transformer uses self-attention to transform input token sequence
 	- Transformer decoder conditions on entire transformed token sequence from Transformer encoder
 		- Also feed $k$ (where $k$ is action chunk length) empty action tokens as input
 		- Use cross attention between $k$ action tokens and Transformer encoder tokens

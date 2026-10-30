@@ -1,4 +1,26 @@
-## Conditional VAE's
+## VQ-VAEs
+- Key idea: train encoder and decoder to transform a continuous action space into a discrete action space with $B$ possible values, that represents the continuous action space well
+	- Can be used for downstream tasks like training a flow-matching policy (that predicts discrete tokens)
+- Simultaneously learn an encoder, decoder, and codebook
+	- Encoder takes action chunk and outputs embedding
+	- Vector Quantizer (VQ) maps embedding to nearest neighbor in learned codebook
+	- Codebook defines the $B$ allowed embeddings
+	- Decoder takes embedding and outputs action chunk
+- Train with loss that minimizes reconstruction error, encourages encoder to predict values closer to the cookbook's embeddings, and encourages cookbook to contain embeddings closer to the encoder's prediction: $$
+\mathcal{L}_{\mathrm{VQ}} =
+\underbrace{\|a - \hat{a}\|^2}_{\text{Reconstruction}}
++
+\underbrace{\|\operatorname{sg}[z_e] - e_k\|^2}_{\text{Codebook}}
++
+\underbrace{\beta \|z_e - \operatorname{sg}[e_k]\|^2}_{\text{Encoder}}
+$$
+- At inference:
+	- flow-matching policy predicts a value between 1 and $B$
+	- Cookbook maps this to an embedding vector
+	- Run the decoder to convert this to an actual action chunk
+	- NOTE: encoder and VQ are discarded at inference time
+
+## Conditional VAEs
 **Concepts**
 - Autoencoders
 	<center><img src="ReadingNotesSupplements/Autoencoder.png" alt="" style="width:600px; margin-top: 10px"/></center>	

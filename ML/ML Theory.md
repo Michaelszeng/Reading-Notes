@@ -5,6 +5,12 @@ https://arxiv.org/pdf/2603.12228
 - Corroborates with literature showing that LLM fine-tuning often has very low intrinsic dimension, and often performs well even when very light-weight
 	- i.e. why LoRA fine-tuning works
 
+## Discrete vs Continuous Action Spaces
+- Discrete logits usually cross-entropy (CE) loss
+	- CE loss has a few advantages:
+		- Its gradient explicitly downweights negative examples (i.e. the incorrect logits)
+		- There is no "distance" (i.e. logit 5 and 6 are equally "close" as logit 5 and 127)
+
 ## Critical Batch Size
 Literature suggests there is an optimal batch size for training to reach lowest loss the fastest (with fewest FLOPS or samples visited)
 - Below this, gradients are too noisy, optimization is slow
