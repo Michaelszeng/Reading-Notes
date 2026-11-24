@@ -156,6 +156,8 @@ KEY IDEA: train MLP-based Gaussian BC policy; fine-tune using Natural Policy Gra
 	- Vanilla OGPO suffers from critic over-estimation + exploitation. Propose 2 fixes:
 		- OGPO+: add BC loss for successful rollouts to anchor policy toward good behavior
 		- OGPO+CA: conservative Q-function estimates from an ensemble; only allow non-zero advantage when all Q-functions in the ensemble agree on the pos./neg. of the Q-value
+[FPO](https://arxiv.org/pdf/2507.21053) + [FPO++](https://arxiv.org/pdf/2602.02481v1)
+- 
 [EXPO]([[2507.07986] EXPO: Stable Reinforcement Learning with Expressive Policies](https://arxiv.org/abs/2507.07986)) + [EXPO-FT](https://arxiv.org/pdf/2605.25477)
 - KEY IDEA: RL on diffusion policies without doing explicit policy optimization (instead, via a continual fine-tuning loop)
 - Base policy $a \sim \pi_{base}(\cdot | s)$, pre-trained using BC

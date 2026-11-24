@@ -16,10 +16,11 @@
 	- Rough idea: queries and keys measure how relevant a word is to another
 	- $W_Q x$ is a query vector of $x$
 	- $W_K x'$ is a key vector of $x'$
-	- We measure the dot product $W_Q x \cdot W_K x'$ to see how much the $x'$ ***attends*** $x$.
+	- We measure the dot product $W_Q x \cdot W_K x'$ to see how much the $x$ ***attends*** $x'$ (how much query attends to key).
 - Attention pattern/matrix:
 	- For a whole sequence of tokens, we create a matrix of dot products of every combination of tokens $W_Q x \cdot W_K x'$
 		<center><img src="ReadingNotesSupplements/self_attention_pattern.png" alt="" style="width:600px; margin-top: 10px"/></center>	
+		- Rows are keys, Columns are queries
 	- We apply softmax to every column so that every column sums to 1.
 		- This way, all key tokens share 1 unit of weight to attend to a particular query token
 - Values:
@@ -33,9 +34,11 @@
 			<center><img src="ReadingNotesSupplements/self_attention_value.png" alt="" style="width:800px; margin-top: 10px"/></center>	
 - The output is then the modified (with attention applied) version of every token.
 - Attention masks:
-	- usually, want to mask later tokens from affecting earlier tokens (in a next-token-prediction setting)
-	- Before applying softmaxes, set lower-diagonal terms to $-\infty$ (so they are zeroed by softmax)
-			<center><img src="ReadingNotesSupplements/self_attention_mask.png" alt="" style="width:600px; margin-top: 10px"/></center>	
+	- Causal attention mask: usually, want to mask later tokens from affecting earlier tokens (in a next-token-prediction setting)
+		- Before applying softmaxes, set lower-diagonal terms to $-\infty$ (so they are zeroed by softmax)
+				<center><img src="ReadingNotesSupplements/self_attention_mask.png" alt="" style="width:600px; margin-top: 10px"/></center>	
+	- There are many ways to do attention masks -- i.e., for a "null" token that you don't want anything else to attend to: 
+		<center><img src="ReadingNotesSupplements/self_attention_pattern_row_mask.png" alt="" style="width:550px; margin-top: 10px"/></center>
 - Summary:
 				<center><img src="ReadingNotesSupplements/self_attention_equation.png" alt="" style="width:600px; margin-top: 10px"/></center>	
 

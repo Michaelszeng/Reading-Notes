@@ -5,11 +5,25 @@ https://arxiv.org/pdf/2603.12228
 - Corroborates with literature showing that LLM fine-tuning often has very low intrinsic dimension, and often performs well even when very light-weight
 	- i.e. why LoRA fine-tuning works
 
-## Discrete vs Continuous Action Spaces
-- Discrete logits usually cross-entropy (CE) loss
-	- CE loss has a few advantages:
-		- Its gradient explicitly downweights negative examples (i.e. the incorrect logits)
-		- There is no "distance" (i.e. logit 5 and 6 are equally "close" as logit 5 and 127)
+## Model Parameterizations 
+- Discrete vs Continuous Action Spaces
+	- Discrete logits usually use cross-entropy (CE) loss
+		- CE loss has a few advantages:
+			- Its gradient explicitly downweights negative examples (i.e. the incorrect logits)
+			- There is no "distance" (i.e. logit 5 and 6 are equally "close" as logit 5 and 127)
+		- CE key disadvantage:
+			- All errors are equally weighted (whether you're off by a lot vs a little)
+	- Discrete *Label Smoothing*:
+		- KEY IDEA: add "distance" back to CE
+			- Rather than one-hot target distributions, make the target distribution a Gaussian 
+			- Use a distributional (i.e. KL) loss
+	- Continuous MSE Loss
+		- Key advantage: natural "distance" metric (larger errors --> larger losses)
+		- Key disadvantage: naturally inclined to upweight "large" trajectories (i.e. with large motions or large coordinates, which tend to induce larger absolute errors)
+	- Continuous MSE Loss in log-space
+		- KEY IDEA: penalize "relative errors" (relative to the scale of the target) instead of absolute errors
+			- $\mathcal L = \bigg(\log \frac{y_{pred}}{y_{true}}\bigg)^2 \quad \leftarrow \quad$  ratio between prediction and target
+		- Key disadvantage: tiny targets (if $y_{true}$ is close to 0) receive huge loss
 
 ## Critical Batch Size
 Literature suggests there is an optimal batch size for training to reach lowest loss the fastest (with fewest FLOPS or samples visited)
